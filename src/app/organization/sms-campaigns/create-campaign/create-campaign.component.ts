@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, ViewChild, inject } from '@angular/core';
+import { Component, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 /** Custom Components */
@@ -22,6 +22,7 @@ import { MatStepper, MatStepperIcon, MatStep, MatStepLabel } from '@angular/mate
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { CampaignPreviewStepComponent } from '../sms-campaign-stepper/campaign-preview-step/campaign-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create SMS Campaign Component
@@ -42,7 +43,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CampaignPreviewStepComponent
   ]
 })
-export class CreateCampaignComponent {
+export class CreateCampaignComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private organizationService = inject(OrganizationService);
@@ -68,7 +70,7 @@ export class CreateCampaignComponent {
    * @param {Dates} dateUtils Date Utils
    */
   constructor() {
-    this.route.data.subscribe((data: { smsCampaignTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { smsCampaignTemplate: any }) => {
       this.smsCampaignTemplate = data.smsCampaignTemplate;
     });
   }
@@ -118,14 +120,22 @@ export class CreateCampaignComponent {
       const prevRecurrenceDate: Date = smsCampaign.recurrenceStartDate;
       smsCampaign.recurrenceStartDate = this.dateUtils.formatDate(prevRecurrenceDate, dateTimeFormat);
     }
-    this.organizationService.createSmsCampaign(smsCampaign).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.organizationService
+      .createSmsCampaign(smsCampaign)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

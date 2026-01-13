@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -23,6 +23,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { GlAccountSelectorComponent } from '../../../shared/accounting/gl-account-selector/gl-account-selector.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Tax Component component.
@@ -36,7 +37,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     GlAccountSelectorComponent
   ]
 })
-export class CreateTaxComponentComponent implements OnInit {
+export class CreateTaxComponentComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private productsService = inject(ProductsService);
   private route = inject(ActivatedRoute);
@@ -71,7 +73,7 @@ export class CreateTaxComponentComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service.
    */
   constructor() {
-    this.route.data.subscribe((data: { taxComponentTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { taxComponentTemplate: any }) => {
       this.taxComponentTemplateData = data.taxComponentTemplate;
     });
   }
@@ -117,14 +119,20 @@ export class CreateTaxComponentComponent implements OnInit {
    * Sets the conditional controls of the tax Component form
    */
   setConditionalControls() {
-    this.taxComponentForm.get('debitAccountType').valueChanges.subscribe((debitAccountTypeId) => {
-      this.debitAccountData = this.getAccountsData(debitAccountTypeId);
-      this.taxComponentForm.addControl('debitAccountId', new UntypedFormControl('', Validators.required));
-    });
-    this.taxComponentForm.get('creditAccountType').valueChanges.subscribe((creditAccountTypeId) => {
-      this.creditAccountData = this.getAccountsData(creditAccountTypeId);
-      this.taxComponentForm.addControl('creditAccountId', new UntypedFormControl('', Validators.required));
-    });
+    this.taxComponentForm
+      .get('debitAccountType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((debitAccountTypeId) => {
+        this.debitAccountData = this.getAccountsData(debitAccountTypeId);
+        this.taxComponentForm.addControl('debitAccountId', new UntypedFormControl('', Validators.required));
+      });
+    this.taxComponentForm
+      .get('creditAccountType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((creditAccountTypeId) => {
+        this.creditAccountData = this.getAccountsData(creditAccountTypeId);
+        this.taxComponentForm.addControl('creditAccountId', new UntypedFormControl('', Validators.required));
+      });
   }
 
   /**
@@ -163,14 +171,22 @@ export class CreateTaxComponentComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.productsService.createTaxComponent(data).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.productsService
+      .createTaxComponent(data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

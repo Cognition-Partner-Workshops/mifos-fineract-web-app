@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Dates } from 'app/core/utils/dates';
@@ -16,6 +16,7 @@ import { Dates } from 'app/core/utils/dates';
 import { OrganizationService } from 'app/organization/organization.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Office component.
@@ -28,7 +29,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class EditOfficeComponent implements OnInit {
+export class EditOfficeComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private organizationService = inject(OrganizationService);
   private settingsService = inject(SettingsService);
   private formBuilder = inject(UntypedFormBuilder);
@@ -56,7 +58,7 @@ export class EditOfficeComponent implements OnInit {
    * @param {Dates} dateUtils Date Utils
    */
   constructor() {
-    this.route.data.subscribe((data: { officeTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { officeTemplate: any }) => {
       this.officeData = data.officeTemplate;
     });
   }
@@ -102,8 +104,16 @@ export class EditOfficeComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.organizationService.updateOffice(this.officeData.id, data).subscribe((response: any) => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.organizationService
+      .updateOffice(this.officeData.id, data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

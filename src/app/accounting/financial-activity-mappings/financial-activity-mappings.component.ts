@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -30,6 +30,7 @@ import { PopoverService } from '../../configuration-wizard/popover/popover.servi
 import { ConfigurationWizardService } from '../../configuration-wizard/configuration-wizard.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Financial activity mappings component.
@@ -56,7 +57,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class FinancialActivityMappingsComponent implements OnInit, AfterViewInit {
+export class FinancialActivityMappingsComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private configurationWizardService = inject(ConfigurationWizardService);
@@ -96,7 +98,7 @@ export class FinancialActivityMappingsComponent implements OnInit, AfterViewInit
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { financialActivityAccounts: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { financialActivityAccounts: any }) => {
       this.financialActivityAccountData = data.financialActivityAccounts;
     });
   }
@@ -180,5 +182,10 @@ export class FinancialActivityMappingsComponent implements OnInit, AfterViewInit
     this.configurationWizardService.showAccountsLinkedList = false;
     this.configurationWizardService.showAccountsLinked = true;
     this.router.navigate(['/accounting']);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

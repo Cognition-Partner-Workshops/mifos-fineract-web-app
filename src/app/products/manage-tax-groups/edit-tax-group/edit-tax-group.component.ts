@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -42,6 +42,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { FindPipe } from '../../../pipes/find.pipe';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Tax Group component.
@@ -69,7 +70,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class EditTaxGroupComponent implements OnInit {
+export class EditTaxGroupComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private productsService = inject(ProductsService);
   private route = inject(ActivatedRoute);
@@ -111,7 +113,7 @@ export class EditTaxGroupComponent implements OnInit {
    * @param {TranslateService} translateService translate Service.
    */
   constructor() {
-    this.route.data.subscribe((data: { taxGroup: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { taxGroup: any }) => {
       this.taxGroupData = data.taxGroup;
       this.taxComponentOptions = this.taxGroupData.taxComponents;
     });
@@ -160,15 +162,18 @@ export class EditTaxGroupComponent implements OnInit {
       formfields: formfields
     };
     const taxComponentDialogRef = this.dialog.open(FormDialogComponent, { data });
-    taxComponentDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const val = {
-          ...response.data.value,
-          isNew: true
-        };
-        this.taxComponentsDataSource = this.taxComponentsDataSource.concat(val);
-      }
-    });
+    taxComponentDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const val = {
+            ...response.data.value,
+            isNew: true
+          };
+          this.taxComponentsDataSource = this.taxComponentsDataSource.concat(val);
+        }
+      });
   }
 
   /**
@@ -209,13 +214,20 @@ export class EditTaxGroupComponent implements OnInit {
       formfields: formfields
     };
     const taxComponentDialogRef = this.dialog.open(FormDialogComponent, { data });
-    taxComponentDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const updatedTaxComponent = { ...taxComponent, ...response.data.value };
-        this.taxComponentsDataSource.splice(this.taxComponentsDataSource.indexOf(taxComponent), 1, updatedTaxComponent);
-        this.taxComponentsDataSource = this.taxComponentsDataSource.concat([]);
-      }
-    });
+    taxComponentDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const updatedTaxComponent = { ...taxComponent, ...response.data.value };
+          this.taxComponentsDataSource.splice(
+            this.taxComponentsDataSource.indexOf(taxComponent),
+            1,
+            updatedTaxComponent
+          );
+          this.taxComponentsDataSource = this.taxComponentsDataSource.concat([]);
+        }
+      });
   }
 
   /**
@@ -241,12 +253,15 @@ export class EditTaxGroupComponent implements OnInit {
     const dialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: this.translateService.instant('labels.text.this') }
     });
-    dialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.taxComponentsDataSource.splice(index, 1);
-        this.taxComponentsDataSource = this.taxComponentsDataSource.concat([]);
-      }
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.taxComponentsDataSource.splice(index, 1);
+          this.taxComponentsDataSource = this.taxComponentsDataSource.concat([]);
+        }
+      });
   }
 
   /**
@@ -270,8 +285,16 @@ export class EditTaxGroupComponent implements OnInit {
       }
       delete taxComponent.isNew;
     }
-    this.productsService.updateTaxGroup(this.taxGroupData.id, taxGroup).subscribe((response: any) => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.productsService
+      .updateTaxGroup(this.taxGroupData.id, taxGroup)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, AfterViewInit, inject } from '@angular/core';
+import { Component, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 
@@ -24,6 +24,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatListSubheaderCssMatStyler, MatNavList } from '@angular/material/list';
 import { MatLine } from '@angular/material/grid-list';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-manage-groups',
@@ -40,7 +41,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatLine
   ]
 })
-export class ManageGroupsComponent implements AfterViewInit {
+export class ManageGroupsComponent implements AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private centersService = inject(CentersService);
   private groupsService = inject(GroupsService);
@@ -63,7 +65,7 @@ export class ManageGroupsComponent implements AfterViewInit {
    * @param {MatDialog} dialog Mat Dialog
    */
   constructor() {
-    this.route.data.subscribe((data: { centersActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { centersActionData: any }) => {
       this.centerData = data.centersActionData;
       this.groupMembers = data.centersActionData.groupMembers;
     });
@@ -73,10 +75,11 @@ export class ManageGroupsComponent implements AfterViewInit {
    * Subscribes to Groups search filter:
    */
   ngAfterViewInit() {
-    this.groupChoice.valueChanges.subscribe((value: string) => {
+    this.groupChoice.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((value: string) => {
       if (value.length >= 2) {
         this.groupsService
           .getFilteredGroups('name', 'ASC', value, this.centerData.officeId, 'true')
+          .pipe(takeUntil(this.destroy$))
           .subscribe((data: any) => {
             this.groupsData = data;
           });
@@ -94,6 +97,7 @@ export class ManageGroupsComponent implements AfterViewInit {
           .executeCenterActionCommand(this.centerData.id, 'associateGroups', {
             groupMembers: [this.groupChoice.value.id]
           })
+          .pipe(takeUntil(this.destroy$))
           .subscribe(() => {
             this.groupMembers.push(this.groupChoice.value);
           });
@@ -103,6 +107,7 @@ export class ManageGroupsComponent implements AfterViewInit {
         .executeCenterActionCommand(this.centerData.id, 'associateGroups', {
           groupMembers: [this.groupChoice.value.id]
         })
+        .pipe(takeUntil(this.destroy$))
         .subscribe(() => {
           this.groupMembers.push(this.groupChoice.value);
         });
@@ -117,15 +122,19 @@ export class ManageGroupsComponent implements AfterViewInit {
     const removeMemberDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `group member: ${group.name}` }
     });
-    removeMemberDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.centersService
-          .executeCenterActionCommand(this.centerData.id, 'disassociateGroups', { groupMembers: [group.id] })
-          .subscribe(() => {
-            this.groupMembers.splice(index, 1);
-          });
-      }
-    });
+    removeMemberDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.centersService
+            .executeCenterActionCommand(this.centerData.id, 'disassociateGroups', { groupMembers: [group.id] })
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.groupMembers.splice(index, 1);
+            });
+        }
+      });
   }
 
   /**
@@ -135,5 +144,10 @@ export class ManageGroupsComponent implements AfterViewInit {
    */
   displayGroup(group: any): string | undefined {
     return group ? group.name : undefined;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

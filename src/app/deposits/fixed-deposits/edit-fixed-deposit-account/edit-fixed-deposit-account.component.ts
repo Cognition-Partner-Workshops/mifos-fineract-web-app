@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, ViewChild, inject } from '@angular/core';
+import { Component, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 /** Custom Services */
@@ -26,6 +26,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { FixedDepositAccountInterestRateChartStepComponent } from '../fixed-deposit-account-stepper/fixed-deposit-account-interest-rate-chart-step/fixed-deposit-account-interest-rate-chart-step.component';
 import { FixedDepositAccountPreviewStepComponent } from '../fixed-deposit-account-stepper/fixed-deposit-account-preview-step/fixed-deposit-account-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Fixed Deposit Account Component
@@ -49,7 +50,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FixedDepositAccountPreviewStepComponent
   ]
 })
-export class EditFixedDepositAccountComponent {
+export class EditFixedDepositAccountComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private dateUtils = inject(Dates);
@@ -85,7 +87,7 @@ export class EditFixedDepositAccountComponent {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { fixedDepositsAccountAndTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { fixedDepositsAccountAndTemplate: any }) => {
       this.fixedDepositsAccountAndTemplate = data.fixedDepositsAccountAndTemplate;
     });
   }
@@ -173,8 +175,14 @@ export class EditFixedDepositAccountComponent {
     };
     this.fixedDepositsService
       .updateFixedDepositAccount(this.fixedDepositsAccountAndTemplate.id, fixedDepositAccount)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: any) => {
         this.router.navigate(['../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

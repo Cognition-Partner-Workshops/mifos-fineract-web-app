@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -16,6 +16,7 @@ import { ClientsService } from 'app/clients/clients.service';
 import { Dates } from 'app/core/utils/dates';
 import { SettingsService } from 'app/settings/settings.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Client Pay Charge component.
@@ -28,7 +29,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class ClientPayChargesComponent implements OnInit {
+export class ClientPayChargesComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private clientsService = inject(ClientsService);
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
@@ -52,7 +54,7 @@ export class ClientPayChargesComponent implements OnInit {
    * @param {SettingsService} settingsService Setting service
    */
   constructor() {
-    this.route.data.subscribe((data: { transactionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { transactionData: any }) => {
       this.transactionData = data.transactionData;
     });
   }
@@ -93,14 +95,22 @@ export class ClientPayChargesComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.clientsService.payClientCharge(this.transactionData.clientId, this.transactionData.id, data).subscribe(() => {
-      this.router.navigate(
-        [
-          '../../..',
-          'general'
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.clientsService
+      .payClientCharge(this.transactionData.clientId, this.transactionData.id, data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.router.navigate(
+          [
+            '../../..',
+            'general'
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
@@ -44,6 +44,7 @@ import { Dates } from 'app/core/utils/dates';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { OrganizationService } from 'app/organization/organization.service';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Individual Collection Sheet
@@ -70,7 +71,8 @@ import { OrganizationService } from 'app/organization/organization.service';
     MatPaginator
   ]
 })
-export class IndividualCollectionSheetComponent implements OnInit {
+export class IndividualCollectionSheetComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private collectionsService = inject(CollectionsService);
   private organizationService = inject(OrganizationService);
@@ -152,7 +154,7 @@ export class IndividualCollectionSheetComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { officesData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { officesData: any }) => {
       this.officesData = data.officesData;
     });
   }
@@ -191,11 +193,17 @@ export class IndividualCollectionSheetComponent implements OnInit {
    * Checks for the office id value change
    */
   buildDependencies() {
-    this.collectionSheetForm.get('officeId').valueChanges.subscribe((value: any) => {
-      this.organizationService.getStaffs(value).subscribe((response: any) => {
-        this.loanOfficerData = response;
+    this.collectionSheetForm
+      .get('officeId')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((value: any) => {
+        this.organizationService
+          .getStaffs(value)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((response: any) => {
+            this.loanOfficerData = response;
+          });
       });
-    });
   }
 
   /**
@@ -300,71 +308,74 @@ export class IndividualCollectionSheetComponent implements OnInit {
       formfields: formfields
     };
     const showPaymentDetailsDialogRef = this.dialog.open(FormDialogComponent, { data });
-    showPaymentDetailsDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        if (type === 'loans') {
-          const totalDue = this.getLoanTotalDueAmount(selectedData);
-          const loanTransaction: {
-            loanId: any;
-            transactionAmount: number;
-            paymentTypeId?: string;
-            accountNumber?: any;
-            checkNumber?: number;
-            routingCode?: string;
-            receiptNumber?: number;
-            bankNumber?: number;
-          } = {
-            loanId: selectedData.loanId,
-            transactionAmount: totalDue
-          };
-          if (response.data.value.paymentTypeId !== '') {
-            loanTransaction['paymentTypeId'] = response.data.value.paymentTypeId;
-            loanTransaction['accountNumber'] = response.data.value.accountNumber;
-            loanTransaction['checkNumber'] = response.data.value.checkNumber;
-            loanTransaction['routingCode'] = response.data.value.routingCode;
-            loanTransaction['receiptNumber'] = response.data.value.receiptNumber;
-            loanTransaction['bankNumber'] = response.data.value.bankNumber;
-          }
-          this.bulkRepaymentTransactions.push(loanTransaction);
-        } else {
-          let dueAmount = selectedData.dueAmount;
-          if (isNaN(dueAmount)) {
-            dueAmount = 0;
-          }
-          const savingsTransaction: {
-            savingsId: any;
-            transactionAmount: any;
-            depositAccountType: number;
-            accountNumber?: any;
-            checkNumber?: number;
-            routingCode?: string;
-            receiptNumber?: number;
-            bankNumber?: number;
-            paymentTypeId?: string;
-          } = {
-            savingsId: selectedData.savingsId,
-            transactionAmount: dueAmount,
-            depositAccountType:
-              selectedData.depositAccountType === 'Saving Deposit'
-                ? 100
-                : selectedData.depositAccountType === 'Recurring Deposit'
-                  ? 300
-                  : 400
-          };
-          if (response.data.paymentTypeId !== '') {
-            savingsTransaction['paymentTypeId'] = response.data.paymentTypeId;
-            savingsTransaction['accountNumber'] = response.data.accountNumber;
-            savingsTransaction['checkNumber'] = response.data.checkNumber;
-            savingsTransaction['routingCode'] = response.data.routingCode;
-            savingsTransaction['receiptNumber'] = response.data.receiptNumber;
-            savingsTransaction['bankNumber'] = response.data.bankNumber;
-          }
-          if (savingsTransaction.transactionAmount > 0) {
-            this.bulkSavingsDueTransactions.push(savingsTransaction);
+    showPaymentDetailsDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          if (type === 'loans') {
+            const totalDue = this.getLoanTotalDueAmount(selectedData);
+            const loanTransaction: {
+              loanId: any;
+              transactionAmount: number;
+              paymentTypeId?: string;
+              accountNumber?: any;
+              checkNumber?: number;
+              routingCode?: string;
+              receiptNumber?: number;
+              bankNumber?: number;
+            } = {
+              loanId: selectedData.loanId,
+              transactionAmount: totalDue
+            };
+            if (response.data.value.paymentTypeId !== '') {
+              loanTransaction['paymentTypeId'] = response.data.value.paymentTypeId;
+              loanTransaction['accountNumber'] = response.data.value.accountNumber;
+              loanTransaction['checkNumber'] = response.data.value.checkNumber;
+              loanTransaction['routingCode'] = response.data.value.routingCode;
+              loanTransaction['receiptNumber'] = response.data.value.receiptNumber;
+              loanTransaction['bankNumber'] = response.data.value.bankNumber;
+            }
+            this.bulkRepaymentTransactions.push(loanTransaction);
+          } else {
+            let dueAmount = selectedData.dueAmount;
+            if (isNaN(dueAmount)) {
+              dueAmount = 0;
+            }
+            const savingsTransaction: {
+              savingsId: any;
+              transactionAmount: any;
+              depositAccountType: number;
+              accountNumber?: any;
+              checkNumber?: number;
+              routingCode?: string;
+              receiptNumber?: number;
+              bankNumber?: number;
+              paymentTypeId?: string;
+            } = {
+              savingsId: selectedData.savingsId,
+              transactionAmount: dueAmount,
+              depositAccountType:
+                selectedData.depositAccountType === 'Saving Deposit'
+                  ? 100
+                  : selectedData.depositAccountType === 'Recurring Deposit'
+                    ? 300
+                    : 400
+            };
+            if (response.data.paymentTypeId !== '') {
+              savingsTransaction['paymentTypeId'] = response.data.paymentTypeId;
+              savingsTransaction['accountNumber'] = response.data.accountNumber;
+              savingsTransaction['checkNumber'] = response.data.checkNumber;
+              savingsTransaction['routingCode'] = response.data.routingCode;
+              savingsTransaction['receiptNumber'] = response.data.receiptNumber;
+              savingsTransaction['bankNumber'] = response.data.bankNumber;
+            }
+            if (savingsTransaction.transactionAmount > 0) {
+              this.bulkSavingsDueTransactions.push(savingsTransaction);
+            }
           }
         }
-      }
-    });
+      });
   }
 
   /**
@@ -382,18 +393,21 @@ export class IndividualCollectionSheetComponent implements OnInit {
     if (collectionSheet.staffId === '') {
       delete collectionSheet.staffId;
     }
-    this.collectionsService.retrieveCollectionSheetData(collectionSheet).subscribe((response: any) => {
-      if (response.clients.length > 0) {
-        this.collectionSheetData = response;
-        this.organizeData(response);
-        this.isCollapsed = true;
-      } else {
-        this.noData = true;
-        setTimeout(() => {
-          this.noData = false;
-        }, 3000);
-      }
-    });
+    this.collectionsService
+      .retrieveCollectionSheetData(collectionSheet)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.clients.length > 0) {
+          this.collectionSheetData = response;
+          this.organizeData(response);
+          this.isCollapsed = true;
+        } else {
+          this.noData = true;
+          setTimeout(() => {
+            this.noData = false;
+          }, 3000);
+        }
+      });
   }
 
   /**
@@ -411,10 +425,13 @@ export class IndividualCollectionSheetComponent implements OnInit {
       transactionDate: this.dateUtils.formatDate(this.collectionSheetForm.value.transactionDate, dateFormat),
       bulkDisbursementTransactions: this.bulkDisbursementTransactionsData
     };
-    this.collectionsService.executeSaveCollectionSheet(finalSubmitData).subscribe(() => {
-      this.reload();
-      localStorage.setItem('Success', 'true');
-    });
+    this.collectionsService
+      .executeSaveCollectionSheet(finalSubmitData)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.reload();
+        localStorage.setItem('Success', 'true');
+      });
   }
 
   /**
@@ -424,5 +441,10 @@ export class IndividualCollectionSheetComponent implements OnInit {
   reload() {
     const url: string = this.router.url;
     this.router.navigateByUrl(`/collections`, { skipLocationChange: true }).then(() => this.router.navigate([url]));
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

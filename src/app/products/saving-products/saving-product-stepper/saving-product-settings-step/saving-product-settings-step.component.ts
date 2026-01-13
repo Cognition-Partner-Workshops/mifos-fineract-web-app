@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, Input, inject } from '@angular/core';
+import { Component, OnInit, Input, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -20,6 +20,7 @@ import { MatDivider } from '@angular/material/divider';
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-saving-product-settings-step',
@@ -35,7 +36,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatStepperNext
   ]
 })
-export class SavingProductSettingsStepComponent implements OnInit {
+export class SavingProductSettingsStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
 
   @Input() savingProductsTemplate: any;
@@ -104,49 +106,59 @@ export class SavingProductSettingsStepComponent implements OnInit {
   }
 
   setConditionalControls() {
-    this.savingProductSettingsForm.get('enableLockinPeriod').valueChanges.subscribe((enableLockinPeriod: any) => {
-      if (enableLockinPeriod) {
-        this.savingProductSettingsForm.addControl(
-          'lockinPeriodFrequency',
-          new UntypedFormControl('', [
-            Validators.required,
-            Validators.min(1),
-            Validators.pattern('^[1-9]\\d*$')
-          ])
-        );
-        this.savingProductSettingsForm.addControl(
-          'lockinPeriodFrequencyType',
-          new UntypedFormControl('', Validators.required)
-        );
-      } else {
-        this.savingProductSettingsForm.removeControl('lockinPeriodFrequency');
-        this.savingProductSettingsForm.removeControl('lockinPeriodFrequencyType');
-      }
-    });
+    this.savingProductSettingsForm
+      .get('enableLockinPeriod')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((enableLockinPeriod: any) => {
+        if (enableLockinPeriod) {
+          this.savingProductSettingsForm.addControl(
+            'lockinPeriodFrequency',
+            new UntypedFormControl('', [
+              Validators.required,
+              Validators.min(1),
+              Validators.pattern('^[1-9]\\d*$')
+            ])
+          );
+          this.savingProductSettingsForm.addControl(
+            'lockinPeriodFrequencyType',
+            new UntypedFormControl('', Validators.required)
+          );
+        } else {
+          this.savingProductSettingsForm.removeControl('lockinPeriodFrequency');
+          this.savingProductSettingsForm.removeControl('lockinPeriodFrequencyType');
+        }
+      });
 
-    this.savingProductSettingsForm.get('allowOverdraft').valueChanges.subscribe((allowOverdraft: any) => {
-      if (allowOverdraft) {
-        this.savingProductSettingsForm.addControl('minOverdraftForInterestCalculation', new UntypedFormControl(''));
-        this.savingProductSettingsForm.addControl('nominalAnnualInterestRateOverdraft', new UntypedFormControl(''));
-        this.savingProductSettingsForm.addControl('overdraftLimit', new UntypedFormControl(''));
-      } else {
-        this.savingProductSettingsForm.removeControl('minOverdraftForInterestCalculation');
-        this.savingProductSettingsForm.removeControl('nominalAnnualInterestRateOverdraft');
-        this.savingProductSettingsForm.removeControl('overdraftLimit');
-      }
-    });
+    this.savingProductSettingsForm
+      .get('allowOverdraft')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((allowOverdraft: any) => {
+        if (allowOverdraft) {
+          this.savingProductSettingsForm.addControl('minOverdraftForInterestCalculation', new UntypedFormControl(''));
+          this.savingProductSettingsForm.addControl('nominalAnnualInterestRateOverdraft', new UntypedFormControl(''));
+          this.savingProductSettingsForm.addControl('overdraftLimit', new UntypedFormControl(''));
+        } else {
+          this.savingProductSettingsForm.removeControl('minOverdraftForInterestCalculation');
+          this.savingProductSettingsForm.removeControl('nominalAnnualInterestRateOverdraft');
+          this.savingProductSettingsForm.removeControl('overdraftLimit');
+        }
+      });
 
-    this.savingProductSettingsForm.get('withHoldTax').valueChanges.subscribe((withHoldTax: any) => {
-      if (withHoldTax) {
-        this.savingProductSettingsForm.addControl('taxGroupId', new UntypedFormControl('', Validators.required));
-      } else {
-        this.savingProductSettingsForm.removeControl('taxGroupId');
-      }
-    });
+    this.savingProductSettingsForm
+      .get('withHoldTax')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((withHoldTax: any) => {
+        if (withHoldTax) {
+          this.savingProductSettingsForm.addControl('taxGroupId', new UntypedFormControl('', Validators.required));
+        } else {
+          this.savingProductSettingsForm.removeControl('taxGroupId');
+        }
+      });
 
     this.savingProductSettingsForm
       .get('isDormancyTrackingActive')
-      .valueChanges.subscribe((isDormancyTrackingActive: any) => {
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((isDormancyTrackingActive: any) => {
         if (isDormancyTrackingActive) {
           this.savingProductSettingsForm.addControl('daysToInactive', new UntypedFormControl('', Validators.required));
           this.savingProductSettingsForm.addControl('daysToDormancy', new UntypedFormControl('', Validators.required));
@@ -163,5 +175,10 @@ export class SavingProductSettingsStepComponent implements OnInit {
     const formValue = { ...this.savingProductSettingsForm.value };
     delete formValue.enableLockinPeriod;
     return formValue;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

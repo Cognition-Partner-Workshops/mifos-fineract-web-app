@@ -7,12 +7,13 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { YesnoPipe } from '../../../pipes/yesno.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Employee Component.
@@ -28,7 +29,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     YesnoPipe
   ]
 })
-export class ViewEmployeeComponent {
+export class ViewEmployeeComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Employee data. */
@@ -39,8 +41,13 @@ export class ViewEmployeeComponent {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { employee: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { employee: any }) => {
       this.employeeData = data.employee;
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

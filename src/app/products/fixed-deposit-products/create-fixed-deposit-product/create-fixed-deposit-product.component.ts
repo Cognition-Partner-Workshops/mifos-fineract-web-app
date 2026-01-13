@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, ViewChild, inject } from '@angular/core';
+import { Component, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 /** Custom Components */
@@ -27,6 +27,7 @@ import { MatStepper, MatStepperIcon, MatStep, MatStepLabel } from '@angular/mate
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { FixedDepositProductPreviewStepComponent } from '../fixed-deposit-product-stepper/fixed-deposit-product-preview-step/fixed-deposit-product-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-create-fixed-deposit-product',
@@ -49,7 +50,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FixedDepositProductPreviewStepComponent
   ]
 })
-export class CreateFixedDepositProductComponent {
+export class CreateFixedDepositProductComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private productsService = inject(ProductsService);
   private router = inject(Router);
@@ -82,7 +84,7 @@ export class CreateFixedDepositProductComponent {
    */
 
   constructor() {
-    this.route.data.subscribe((data: { fixedDepositProductsTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { fixedDepositProductsTemplate: any }) => {
       this.fixedDepositProductsTemplate = data.fixedDepositProductsTemplate;
     });
     this.accountingRuleData = this.accounting.getAccountingRulesForSavings();
@@ -143,14 +145,22 @@ export class CreateFixedDepositProductComponent {
       locale: this.settingsService.language.code // locale required for depositAmount
     };
     delete fixedDepositProduct.advancedAccountingRules;
-    this.productsService.createFixedDepositProduct(fixedDepositProduct).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.productsService
+      .createFixedDepositProduct(fixedDepositProduct)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

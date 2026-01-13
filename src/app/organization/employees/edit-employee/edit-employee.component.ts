@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 
@@ -17,6 +17,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Employee Component.
@@ -30,7 +31,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatCheckbox
   ]
 })
-export class EditEmployeeComponent implements OnInit {
+export class EditEmployeeComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
   private settingsService = inject(SettingsService);
@@ -59,7 +61,7 @@ export class EditEmployeeComponent implements OnInit {
    * @param {Dates} dateUtils Date Utils to format date.
    */
   constructor() {
-    this.route.data.subscribe((data: { employee: any; offices: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { employee: any; offices: any }) => {
       this.employeeData = data.employee;
       this.officeData = data.employee.allowedOffices;
     });
@@ -123,14 +125,22 @@ export class EditEmployeeComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.organizationService.updateEmployee(this.employeeData.id, data).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.organizationService
+      .updateEmployee(this.employeeData.id, data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

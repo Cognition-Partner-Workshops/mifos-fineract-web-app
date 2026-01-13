@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -16,6 +16,7 @@ import { ClientsService } from 'app/clients/clients.service';
 import { Dates } from 'app/core/utils/dates';
 import { SettingsService } from 'app/settings/settings.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Close Client Component
@@ -28,7 +29,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class CloseClientComponent implements OnInit {
+export class CloseClientComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private clientsService = inject(ClientsService);
   private dateUtils = inject(Dates);
@@ -56,7 +58,7 @@ export class CloseClientComponent implements OnInit {
    * @param {SettingsService} settingsService Setting service
    */
   constructor() {
-    this.route.data.subscribe((data: { clientActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientActionData: any }) => {
       this.closureData = data.clientActionData.narrations;
     });
     this.clientId = this.route.parent.snapshot.params['clientId'];
@@ -99,8 +101,16 @@ export class CloseClientComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.clientsService.executeClientCommand(this.clientId, 'close', data).subscribe(() => {
-      this.router.navigate(['../../'], { relativeTo: this.route });
-    });
+    this.clientsService
+      .executeClientCommand(this.clientId, 'close', data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.router.navigate(['../../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

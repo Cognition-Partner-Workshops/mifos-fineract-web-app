@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -28,6 +28,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatNavList, MatListSubheaderCssMatStyler } from '@angular/material/list';
 import { MatLine } from '@angular/material/grid-list';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Center component.
@@ -46,7 +47,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatLine
   ]
 })
-export class CreateCenterComponent implements OnInit {
+export class CreateCenterComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -83,7 +85,7 @@ export class CreateCenterComponent implements OnInit {
    * @param {Dates} dateUtils Date Utils to format date.
    */
   constructor() {
-    this.route.data.subscribe((data: { offices: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { offices: any }) => {
       this.officeData = data.offices;
     });
   }
@@ -128,31 +130,43 @@ export class CreateCenterComponent implements OnInit {
    * Adds form control Activation Date if active.
    */
   buildDependencies() {
-    this.centerForm.get('officeId').valueChanges.subscribe((option: any) => {
-      this.groupService.getGroupsByOfficeId(option).subscribe((data: any) => {
-        this.groupsData = data;
-        if (!this.groupsData.length) {
-          this.groupChoice.disable();
+    this.centerForm
+      .get('officeId')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((option: any) => {
+        this.groupService
+          .getGroupsByOfficeId(option)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((data: any) => {
+            this.groupsData = data;
+            if (!this.groupsData.length) {
+              this.groupChoice.disable();
+            } else {
+              this.groupChoice.enable();
+            }
+          });
+        this.centerService
+          .getStaff(option)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((data: any) => {
+            this.staffData = data['staffOptions'];
+            if (this.staffData === undefined) {
+              this.centerForm.controls['staffId'].disable();
+            } else {
+              this.centerForm.controls['staffId'].enable();
+            }
+          });
+      });
+    this.centerForm
+      .get('active')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((bool: boolean) => {
+        if (bool) {
+          this.centerForm.addControl('activationDate', new UntypedFormControl('', Validators.required));
         } else {
-          this.groupChoice.enable();
+          this.centerForm.removeControl('activationDate');
         }
       });
-      this.centerService.getStaff(option).subscribe((data: any) => {
-        this.staffData = data['staffOptions'];
-        if (this.staffData === undefined) {
-          this.centerForm.controls['staffId'].disable();
-        } else {
-          this.centerForm.controls['staffId'].enable();
-        }
-      });
-    });
-    this.centerForm.get('active').valueChanges.subscribe((bool: boolean) => {
-      if (bool) {
-        this.centerForm.addControl('activationDate', new UntypedFormControl('', Validators.required));
-      } else {
-        this.centerForm.removeControl('activationDate');
-      }
-    });
   }
 
   /**
@@ -194,8 +208,16 @@ export class CreateCenterComponent implements OnInit {
     };
     data.groupMembers = [];
     this.groupMembers.forEach((group: any) => data.groupMembers.push(group.id));
-    this.centerService.createCenter(data).subscribe((response: any) => {
-      this.router.navigate(['../centers']);
-    });
+    this.centerService
+      .createCenter(data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../centers']);
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { MatCheckbox } from '@angular/material/checkbox';
 
 import { MatPaginator } from '@angular/material/paginator';
@@ -16,8 +16,8 @@ import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
 /** rxjs Imports */
-import { merge } from 'rxjs';
-import { tap, startWith, map, distinctUntilChanged, debounceTime } from 'rxjs/operators';
+import { merge, Subject } from 'rxjs';
+import { tap, startWith, map, distinctUntilChanged, debounceTime, takeUntil } from 'rxjs/operators';
 
 /** Custom Services */
 import { CentersService } from './centers.service';
@@ -70,7 +70,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     StatusLookupPipe
   ]
 })
-export class CentersComponent implements OnInit, AfterViewInit {
+export class CentersComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private centersService = inject(CentersService);
 
   @ViewChild('showClosedCenters', { static: true }) showClosedCenters: MatCheckbox;
@@ -124,6 +125,7 @@ export class CentersComponent implements OnInit, AfterViewInit {
           this.applyFilter(filterValue, 'name');
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
     this.externalId.valueChanges
@@ -134,12 +136,14 @@ export class CentersComponent implements OnInit, AfterViewInit {
           this.applyFilter(filterValue, 'externalId');
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
-    this.sort.sortChange.subscribe(() => (this.paginator.pageIndex = 0));
+    this.sort.sortChange.pipe(takeUntil(this.destroy$)).subscribe(() => (this.paginator.pageIndex = 0));
 
     merge(this.sort.sortChange, this.paginator.page)
       .pipe(tap(() => this.loadCentersPage()))
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
   }
 
@@ -191,5 +195,10 @@ export class CentersComponent implements OnInit, AfterViewInit {
       this.paginator.pageIndex,
       this.paginator.pageSize
     );
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

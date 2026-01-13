@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Accounting } from 'app/core/utils/accounting';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
@@ -28,6 +28,7 @@ import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { YesnoPipe } from '../../../../pipes/yesno.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-share-product-general-tab',
@@ -53,7 +54,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     YesnoPipe
   ]
 })
-export class ShareProductGeneralTabComponent {
+export class ShareProductGeneralTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private accounting = inject(Accounting);
 
@@ -71,12 +73,17 @@ export class ShareProductGeneralTabComponent {
   ];
 
   constructor() {
-    this.route.data.subscribe((data: { shareProduct: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { shareProduct: any }) => {
       this.shareProduct = data.shareProduct;
     });
   }
 
   getAccountingRuleName(value: string): string {
     return this.accounting.getAccountRuleName(value.toUpperCase());
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

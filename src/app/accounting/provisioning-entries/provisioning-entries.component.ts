@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -30,6 +30,7 @@ import { AccountingService } from '../accounting.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Provisioning entries component.
@@ -57,7 +58,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class ProvisioningEntriesComponent implements OnInit {
+export class ProvisioningEntriesComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -88,7 +90,7 @@ export class ProvisioningEntriesComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { provisioningEntries: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { provisioningEntries: any }) => {
       this.provisioningEntryData = data.provisioningEntries.pageItems;
     });
   }
@@ -123,15 +125,18 @@ export class ProvisioningEntriesComponent implements OnInit {
    * @param {string} provisioningEntryId Provisioning entry id.
    */
   recreateProvisioning($event: Event, provisioningEntryId: string) {
-    this.accountingService.recreateProvisioningEntries(provisioningEntryId).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          'view',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.accountingService
+      .recreateProvisioningEntries(provisioningEntryId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            'view',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
     $event.stopPropagation();
   }
 
@@ -149,5 +154,10 @@ export class ProvisioningEntriesComponent implements OnInit {
       { relativeTo: this.route }
     );
     $event.stopPropagation();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

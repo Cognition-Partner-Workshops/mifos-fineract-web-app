@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -26,7 +26,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 /** rxjs Imports */
-import { of } from 'rxjs';
+import { of, Subject, takeUntil } from 'rxjs';
 
 /** Custom Services */
 import { PopoverService } from '../../configuration-wizard/popover/popover.service';
@@ -61,7 +61,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class EmployeesComponent implements OnInit, AfterViewInit {
+export class EmployeesComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private configurationWizardService = inject(ConfigurationWizardService);
@@ -102,7 +103,7 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { employees: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { employees: any }) => {
       this.employeesData = data.employees;
     });
   }
@@ -181,5 +182,10 @@ export class EmployeesComponent implements OnInit, AfterViewInit {
     this.configurationWizardService.showEmployeeTable = false;
     this.configurationWizardService.showCreateEmployee = true;
     this.router.navigate(['/organization']);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

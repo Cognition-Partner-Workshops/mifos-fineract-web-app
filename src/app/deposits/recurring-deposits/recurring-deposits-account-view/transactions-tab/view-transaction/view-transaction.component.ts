@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -24,6 +24,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { TransactionPaymentDetailComponent } from '../../../../../shared/transaction-payment-detail/transaction-payment-detail.component';
 import { DateFormatPipe } from '../../../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Transaction Component.
@@ -42,7 +43,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ViewTransactionComponent {
+export class ViewTransactionComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private recurringDepositsService = inject(RecurringDepositsService);
   private route = inject(ActivatedRoute);
   private location = inject(Location);
@@ -65,7 +67,7 @@ export class ViewTransactionComponent {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositsAccountTransaction: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountTransaction: any }) => {
       this.transactionData = data.recurringDepositsAccountTransaction;
     });
   }
@@ -83,26 +85,30 @@ export class ViewTransactionComponent {
         )
       }
     });
-    undoTransactionAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
-        const locale = this.settingsService.language.code;
-        const dateFormat = this.settingsService.dateFormat;
-        const data = {
-          transactionDate: this.dateUtils.formatDate(
-            this.transactionData.date && new Date(this.transactionData.date),
-            dateFormat
-          ),
-          transactionAmount: 0,
-          dateFormat,
-          locale
-        };
-        this.recurringDepositsService
-          .executeRecurringDepositsAccountTransactionsCommand(accountId, 'undo', data, this.transactionData.id)
-          .subscribe(() => {
-            this.router.navigate(['../'], { relativeTo: this.route });
-          });
-      }
-    });
+    undoTransactionAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.confirm) {
+          const locale = this.settingsService.language.code;
+          const dateFormat = this.settingsService.dateFormat;
+          const data = {
+            transactionDate: this.dateUtils.formatDate(
+              this.transactionData.date && new Date(this.transactionData.date),
+              dateFormat
+            ),
+            transactionAmount: 0,
+            dateFormat,
+            locale
+          };
+          this.recurringDepositsService
+            .executeRecurringDepositsAccountTransactionsCommand(accountId, 'undo', data, this.transactionData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['../'], { relativeTo: this.route });
+            });
+        }
+      });
   }
 
   transactionColor(): string {
@@ -114,5 +120,10 @@ export class ViewTransactionComponent {
 
   goBack(): void {
     this.location.back();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

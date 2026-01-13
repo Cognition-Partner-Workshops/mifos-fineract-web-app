@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
@@ -34,6 +34,7 @@ import { DeleteDialogComponent } from '../../shared/delete-dialog/delete-dialog.
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatTooltip } from '@angular/material/tooltip';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Entity Data Table Checks component.
@@ -61,7 +62,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class EntityDataTableChecksComponent implements OnInit {
+export class EntityDataTableChecksComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private organizationService = inject(OrganizationService);
   private route = inject(ActivatedRoute);
   private dialog = inject(MatDialog);
@@ -111,7 +113,7 @@ export class EntityDataTableChecksComponent implements OnInit {
    * @param {MatDialog} dialog Dialog reference.
    */
   constructor() {
-    this.route.data.subscribe((data: { entityDataTableChecks: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { entityDataTableChecks: any }) => {
       this.entityDataTableChecksData = data.entityDataTableChecks.pageItems;
     });
   }
@@ -171,15 +173,26 @@ export class EntityDataTableChecksComponent implements OnInit {
     const deleteEntityDataTableCheckDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `entity data table check ${entityDataTableCheckId}` }
     });
-    deleteEntityDataTableCheckDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.organizationService.deleteEntityDataTableCheck(entityDataTableCheckId).subscribe(() => {
-          this.entityDataTableChecksData = this.entityDataTableChecksData.filter(
-            (entityDataTableChecks: any) => entityDataTableChecks.id !== entityDataTableCheckId
-          );
-          this.dataSource.data = this.entityDataTableChecksData;
-        });
-      }
-    });
+    deleteEntityDataTableCheckDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.organizationService
+            .deleteEntityDataTableCheck(entityDataTableCheckId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.entityDataTableChecksData = this.entityDataTableChecksData.filter(
+                (entityDataTableChecks: any) => entityDataTableChecks.id !== entityDataTableCheckId
+              );
+              this.dataSource.data = this.entityDataTableChecksData;
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

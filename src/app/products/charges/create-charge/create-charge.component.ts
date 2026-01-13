@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -28,6 +28,7 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { ValidateOnFocusDirective } from '../../../directives/validate-on-focus.directive';
 import { GlAccountSelectorComponent } from '../../../shared/accounting/gl-account-selector/gl-account-selector.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create charge component.
@@ -44,7 +45,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     GlAccountSelectorComponent
   ]
 })
-export class CreateChargeComponent implements OnInit {
+export class CreateChargeComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private productsService = inject(ProductsService);
   private route = inject(ActivatedRoute);
@@ -81,7 +83,7 @@ export class CreateChargeComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { chargesTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { chargesTemplate: any }) => {
       this.chargesTemplateData = data.chargesTemplate;
       const incomeOptions = data.chargesTemplate.incomeOrLiabilityAccountOptions.incomeAccountOptions || [];
       const liabilityOptions = data.chargesTemplate.incomeOrLiabilityAccountOptions.liabilityAccountOptions || [];
@@ -152,26 +154,29 @@ export class CreateChargeComponent implements OnInit {
    * Sets the charge calculation type and charge time type data
    */
   setChargeForm() {
-    this.chargeForm.get('chargeAppliesTo').valueChanges.subscribe((chargeAppliesTo) => {
-      switch (chargeAppliesTo) {
-        case 1:
-          this.chargeCalculationTypeData = this.chargesTemplateData.loanChargeCalculationTypeOptions;
-          this.chargeTimeTypeData = this.chargesTemplateData.loanChargeTimeTypeOptions;
-          break;
-        case 2:
-          this.chargeCalculationTypeData = this.chargesTemplateData.savingsChargeCalculationTypeOptions;
-          this.chargeTimeTypeData = this.chargesTemplateData.savingsChargeTimeTypeOptions;
-          break;
-        case 3:
-          this.chargeCalculationTypeData = this.chargesTemplateData.clientChargeCalculationTypeOptions;
-          this.chargeTimeTypeData = this.chargesTemplateData.clientChargeTimeTypeOptions;
-          break;
-        case 4:
-          this.chargeCalculationTypeData = this.chargesTemplateData.shareChargeCalculationTypeOptions;
-          this.chargeTimeTypeData = this.chargesTemplateData.shareChargeTimeTypeOptions;
-          break;
-      }
-    });
+    this.chargeForm
+      .get('chargeAppliesTo')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((chargeAppliesTo) => {
+        switch (chargeAppliesTo) {
+          case 1:
+            this.chargeCalculationTypeData = this.chargesTemplateData.loanChargeCalculationTypeOptions;
+            this.chargeTimeTypeData = this.chargesTemplateData.loanChargeTimeTypeOptions;
+            break;
+          case 2:
+            this.chargeCalculationTypeData = this.chargesTemplateData.savingsChargeCalculationTypeOptions;
+            this.chargeTimeTypeData = this.chargesTemplateData.savingsChargeTimeTypeOptions;
+            break;
+          case 3:
+            this.chargeCalculationTypeData = this.chargesTemplateData.clientChargeCalculationTypeOptions;
+            this.chargeTimeTypeData = this.chargesTemplateData.clientChargeTimeTypeOptions;
+            break;
+          case 4:
+            this.chargeCalculationTypeData = this.chargesTemplateData.shareChargeCalculationTypeOptions;
+            this.chargeTimeTypeData = this.chargesTemplateData.shareChargeTimeTypeOptions;
+            break;
+        }
+      });
   }
 
   /**
@@ -228,91 +233,103 @@ export class CreateChargeComponent implements OnInit {
    * Sets the conditional controls of the user form
    */
   setConditionalControls() {
-    this.chargeForm.get('chargeAppliesTo').valueChanges.subscribe((chargeAppliesTo) => {
-      this.chargeForm.get('penalty').enable();
-      switch (chargeAppliesTo) {
-        case 1: // Loan
-          this.chargeForm.addControl('chargePaymentMode', new UntypedFormControl('', Validators.required));
-          this.chargeForm.removeControl('incomeAccountId');
-          break;
-        case 2: // Savings
-          this.chargeForm.removeControl('chargePaymentMode');
-          this.chargeForm.removeControl('incomeAccountId');
-          break;
-        case 3: // Client
-          this.chargeForm.removeControl('chargePaymentMode');
-          this.chargeForm.addControl('incomeAccountId', new UntypedFormControl(''));
-          break;
-        case 4: // Shares
-          this.chargeForm.removeControl('chargePaymentMode');
-          this.chargeForm.removeControl('incomeAccountId');
-          this.chargeForm.get('penalty').setValue(false);
-          break;
-      }
-      this.chargeForm.get('chargeCalculationType').reset();
-      this.chargeForm.get('chargeTimeType').reset();
-    });
-    this.chargeForm.get('chargeTimeType').valueChanges.subscribe((chargeTimeType) => {
-      this.chargeForm.removeControl('feeFrequency');
-      this.chargeForm.removeControl('feeInterval');
-      this.chargeForm.removeControl('feeOnMonthDay');
-      this.chargeForm.removeControl('addFeeFrequency');
-      if (this.chargeForm.get('chargeAppliesTo').value !== 4) {
+    this.chargeForm
+      .get('chargeAppliesTo')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((chargeAppliesTo) => {
         this.chargeForm.get('penalty').enable();
-      }
-      switch (chargeTimeType) {
-        case 6: // Annual Fee
-          this.chargeForm.addControl('feeOnMonthDay', new UntypedFormControl('', Validators.required));
-          break;
-        case 7: // Monthly Fee
-          this.chargeForm.addControl('feeOnMonthDay', new UntypedFormControl(''));
-          this.chargeForm.addControl(
-            'feeInterval',
-            new UntypedFormControl('', [
-              Validators.required,
-              Validators.min(1),
-              Validators.max(12),
-              Validators.pattern('^[1-9]\\d*$')
-            ])
-          );
-          this.repeatEveryLabel = 'Months';
-          break;
-        case 9: // Overdue Fee
-          this.chargeForm.get('penalty').setValue(true);
-          this.chargeForm.addControl('addFeeFrequency', new UntypedFormControl(false));
-          this.chargeForm.get('addFeeFrequency').valueChanges.subscribe((addFeeFrequency) => {
-            if (addFeeFrequency) {
-              this.chargeForm.addControl('feeFrequency', new UntypedFormControl('', Validators.required));
-              this.chargeForm.addControl(
-                'feeInterval',
-                new UntypedFormControl('', [
-                  Validators.required,
-                  Validators.pattern('^[1-9]\\d*$')
-                ])
-              );
-            } else {
-              this.chargeForm.removeControl('feeFrequency');
-              this.chargeForm.removeControl('feeInterval');
-            }
-          });
-          break;
-        case 11: // Weekly Fee
-          this.chargeForm.addControl(
-            'feeInterval',
-            new UntypedFormControl('', [
-              Validators.required,
-              Validators.pattern('^[1-9]\\d*$')
-            ])
-          );
-          this.repeatEveryLabel = 'Weeks';
-          break;
-      }
-    });
-    this.chargeForm.get('currencyCode').valueChanges.subscribe((currencyCode) => {
-      this.currencyDecimalPlaces = this.chargesTemplateData.currencyOptions.find(
-        (currency: any) => currency.code === currencyCode
-      ).decimalPlaces;
-    });
+        switch (chargeAppliesTo) {
+          case 1: // Loan
+            this.chargeForm.addControl('chargePaymentMode', new UntypedFormControl('', Validators.required));
+            this.chargeForm.removeControl('incomeAccountId');
+            break;
+          case 2: // Savings
+            this.chargeForm.removeControl('chargePaymentMode');
+            this.chargeForm.removeControl('incomeAccountId');
+            break;
+          case 3: // Client
+            this.chargeForm.removeControl('chargePaymentMode');
+            this.chargeForm.addControl('incomeAccountId', new UntypedFormControl(''));
+            break;
+          case 4: // Shares
+            this.chargeForm.removeControl('chargePaymentMode');
+            this.chargeForm.removeControl('incomeAccountId');
+            this.chargeForm.get('penalty').setValue(false);
+            break;
+        }
+        this.chargeForm.get('chargeCalculationType').reset();
+        this.chargeForm.get('chargeTimeType').reset();
+      });
+    this.chargeForm
+      .get('chargeTimeType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((chargeTimeType) => {
+        this.chargeForm.removeControl('feeFrequency');
+        this.chargeForm.removeControl('feeInterval');
+        this.chargeForm.removeControl('feeOnMonthDay');
+        this.chargeForm.removeControl('addFeeFrequency');
+        if (this.chargeForm.get('chargeAppliesTo').value !== 4) {
+          this.chargeForm.get('penalty').enable();
+        }
+        switch (chargeTimeType) {
+          case 6: // Annual Fee
+            this.chargeForm.addControl('feeOnMonthDay', new UntypedFormControl('', Validators.required));
+            break;
+          case 7: // Monthly Fee
+            this.chargeForm.addControl('feeOnMonthDay', new UntypedFormControl(''));
+            this.chargeForm.addControl(
+              'feeInterval',
+              new UntypedFormControl('', [
+                Validators.required,
+                Validators.min(1),
+                Validators.max(12),
+                Validators.pattern('^[1-9]\\d*$')
+              ])
+            );
+            this.repeatEveryLabel = 'Months';
+            break;
+          case 9: // Overdue Fee
+            this.chargeForm.get('penalty').setValue(true);
+            this.chargeForm.addControl('addFeeFrequency', new UntypedFormControl(false));
+            this.chargeForm
+              .get('addFeeFrequency')
+              .valueChanges.pipe(takeUntil(this.destroy$))
+              .subscribe((addFeeFrequency) => {
+                if (addFeeFrequency) {
+                  this.chargeForm.addControl('feeFrequency', new UntypedFormControl('', Validators.required));
+                  this.chargeForm.addControl(
+                    'feeInterval',
+                    new UntypedFormControl('', [
+                      Validators.required,
+                      Validators.pattern('^[1-9]\\d*$')
+                    ])
+                  );
+                } else {
+                  this.chargeForm.removeControl('feeFrequency');
+                  this.chargeForm.removeControl('feeInterval');
+                }
+              });
+            break;
+          case 11: // Weekly Fee
+            this.chargeForm.addControl(
+              'feeInterval',
+              new UntypedFormControl('', [
+                Validators.required,
+                Validators.pattern('^[1-9]\\d*$')
+              ])
+            );
+            this.repeatEveryLabel = 'Weeks';
+            break;
+        }
+      });
+    this.chargeForm
+      .get('currencyCode')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((currencyCode) => {
+        this.currencyDecimalPlaces = this.chargesTemplateData.currencyOptions.find(
+          (currency: any) => currency.code === currencyCode
+        ).decimalPlaces;
+      });
   }
 
   /**
@@ -342,8 +359,16 @@ export class CreateChargeComponent implements OnInit {
     if (!data.maxCap) {
       delete data.maxCap;
     }
-    this.productsService.createCharge(data).subscribe((response: any) => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.productsService
+      .createCharge(data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

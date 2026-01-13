@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, Input, OnInit, inject } from '@angular/core';
+import { Component, Input, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -27,6 +27,7 @@ import { InputAmountComponent } from '../../../../shared/input-amount/input-amou
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Deposits Recurring Deposits Account Component
@@ -42,7 +43,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class DepositRecurringDepositsAccountComponent implements OnInit {
+export class DepositRecurringDepositsAccountComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -83,7 +85,7 @@ export class DepositRecurringDepositsAccountComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositsAccountActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountActionData: any }) => {
       this.transactionAmount = data.recurringDepositsAccountActionData.amount;
       this.paymentTypes = data.recurringDepositsAccountActionData.paymentTypeOptions;
       if (
@@ -180,8 +182,14 @@ export class DepositRecurringDepositsAccountComponent implements OnInit {
     data['transactionAmount'] = data['transactionAmount'] * 1;
     this.recurringDepositsService
       .executeRecurringDepositsAccountCommand(this.accountId, this.action, data)
+      .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.router.navigate(['../../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -17,6 +17,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 /**
  * Periodic accruals component.
  */
@@ -29,7 +30,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FaIconComponent
   ]
 })
-export class PeriodicAccrualsComponent implements OnInit {
+export class PeriodicAccrualsComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private accountingService = inject(AccountingService);
   private settingsService = inject(SettingsService);
@@ -76,8 +78,16 @@ export class PeriodicAccrualsComponent implements OnInit {
     if (periodicAccruals.tillDate instanceof Date) {
       periodicAccruals.tillDate = this.dateUtils.formatDate(periodicAccruals.tillDate, this.settingsService.dateFormat);
     }
-    this.accountingService.executePeriodicAccruals(periodicAccruals).subscribe(() => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.accountingService
+      .executePeriodicAccruals(periodicAccruals)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

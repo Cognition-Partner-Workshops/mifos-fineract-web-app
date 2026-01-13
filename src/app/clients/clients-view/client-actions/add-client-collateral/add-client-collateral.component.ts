@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -18,6 +18,7 @@ import { ClientsService } from 'app/clients/clients.service';
 import { ProductsService } from 'app/products/products.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-add-client-collateral',
@@ -27,7 +28,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class AddClientCollateralComponent implements OnInit {
+export class AddClientCollateralComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -52,7 +54,7 @@ export class AddClientCollateralComponent implements OnInit {
    * @param {ProductsService} productsService Products Service
    */
   constructor() {
-    this.route.data.subscribe((data: { clientActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientActionData: any }) => {
       this.clientCollateralOptions = data.clientActionData;
     });
     this.clientId = this.route.parent.snapshot.params['clientId'];
@@ -67,24 +69,31 @@ export class AddClientCollateralComponent implements OnInit {
    * Subscribe to Form controls value changes
    */
   buildDependencies() {
-    this.clientCollateralForm.controls.collateralId.valueChanges.subscribe((collateralId) => {
-      this.productsService.getCollateral(collateralId).subscribe((data: any) => {
-        this.collateralDetails = data;
+    this.clientCollateralForm.controls.collateralId.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((collateralId) => {
+        this.productsService
+          .getCollateral(collateralId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((data: any) => {
+            this.collateralDetails = data;
+            this.clientCollateralForm.patchValue({
+              name: data.name,
+              quality: data.quality,
+              unitType: data.unitType,
+              basePrice: this.collateralDetails.basePrice,
+              pctToBase: this.collateralDetails.pctToBase
+            });
+          });
+      });
+    this.clientCollateralForm.controls.quantity.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((quantity: any) => {
         this.clientCollateralForm.patchValue({
-          name: data.name,
-          quality: data.quality,
-          unitType: data.unitType,
-          basePrice: this.collateralDetails.basePrice,
-          pctToBase: this.collateralDetails.pctToBase
+          totalValue: this.collateralDetails.basePrice * quantity,
+          totalCollateralValue: (this.collateralDetails.basePrice * this.collateralDetails.pctToBase * quantity) / 100
         });
       });
-    });
-    this.clientCollateralForm.controls.quantity.valueChanges.subscribe((quantity: any) => {
-      this.clientCollateralForm.patchValue({
-        totalValue: this.collateralDetails.basePrice * quantity,
-        totalCollateralValue: (this.collateralDetails.basePrice * this.collateralDetails.pctToBase * quantity) / 100
-      });
-    });
   }
 
   /**
@@ -122,8 +131,16 @@ export class AddClientCollateralComponent implements OnInit {
       quantity,
       locale
     };
-    this.clientsService.createClientCollateral(this.clientId, clientCollateral).subscribe(() => {
-      this.router.navigate(['../../'], { relativeTo: this.route });
-    });
+    this.clientsService
+      .createClientCollateral(this.clientId, clientCollateral)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.router.navigate(['../../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -8,7 +8,7 @@
 
 /** Angular Imports. */
 import { SelectionModel } from '@angular/cdk/collections';
-import { Component, OnInit, ViewChild, Injectable, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, Injectable, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormBuilder,
   UntypedFormGroup,
@@ -40,6 +40,7 @@ import { MatIconButton, MatButton } from '@angular/material/button';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatIcon } from '@angular/material/icon';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Holiday component.
@@ -60,7 +61,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatIcon
   ]
 })
-export class CreateHolidayComponent implements OnInit {
+export class CreateHolidayComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private dateUtils = inject(Dates);
@@ -121,7 +123,7 @@ export class CreateHolidayComponent implements OnInit {
   constructor() {
     const _database = this._database;
 
-    this.route.data.subscribe((data: { offices: any; holidayTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { offices: any; holidayTemplate: any }) => {
       this.officesData = data.offices;
       this.repaymentSchedulingTypes = data.holidayTemplate;
       // Constructs trie everytime data changes
@@ -134,7 +136,7 @@ export class CreateHolidayComponent implements OnInit {
     this.dataSource = new MatTreeFlatDataSource(this.treeControl, this.treeFlattener);
 
     // Listens for changes in CheckListDatabase
-    this._database.dataChange.subscribe((data) => {
+    this._database.dataChange.pipe(takeUntil(this.destroy$)).subscribe((data) => {
       this.dataSource.data = data;
     });
   }
@@ -324,13 +326,16 @@ export class CreateHolidayComponent implements OnInit {
    * Sets the conditional controls.
    */
   buildDependencies() {
-    this.holidayForm.get('reschedulingType').valueChanges.subscribe((option: any) => {
-      if (option === 2) {
-        this.holidayForm.addControl('repaymentsRescheduledTo', new UntypedFormControl('', Validators.required));
-      } else {
-        this.holidayForm.removeControl('repaymentsRescheduledTo');
-      }
-    });
+    this.holidayForm
+      .get('reschedulingType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((option: any) => {
+        if (option === 2) {
+          this.holidayForm.addControl('repaymentsRescheduledTo', new UntypedFormControl('', Validators.required));
+        } else {
+          this.holidayForm.removeControl('repaymentsRescheduledTo');
+        }
+      });
   }
 
   /**
@@ -373,14 +378,22 @@ export class CreateHolidayComponent implements OnInit {
       locale,
       offices
     };
-    this.organizationService.createHoliday(data).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.organizationService
+      .createHoliday(data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -22,6 +22,7 @@ import { ClientsService } from 'app/clients/clients.service';
 import { Dates } from 'app/core/utils/dates';
 import { SettingsService } from 'app/settings/settings.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Add Clients Charge component.
@@ -34,7 +35,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class AddClientChargeComponent implements OnInit {
+export class AddClientChargeComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -65,7 +67,7 @@ export class AddClientChargeComponent implements OnInit {
    * @param {SettingsService} settingsService Setting service
    */
   constructor() {
-    this.route.data.subscribe((data: { clientActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientActionData: any }) => {
       this.clientChargeOptions = data.clientActionData.chargeOptions;
     });
     this.clientId = this.route.parent.snapshot.params['clientId'];
@@ -81,40 +83,46 @@ export class AddClientChargeComponent implements OnInit {
    * Subscribe to form controls value changes
    */
   buildDependencies() {
-    this.clientChargeForm.controls.chargeId.valueChanges.subscribe((chargeId) => {
-      this.clientsService.getChargeAndTemplate(chargeId).subscribe((data: any) => {
-        this.chargeDetails = data;
-        const chargeTimeType = data.chargeTimeType.id;
-        if (data.chargeTimeType.value === 'Withdrawal Fee' || data.chargeTimeType.value === 'Saving No Activity Fee') {
-          this.chargeDetails.dueDateNotRequired = true;
-        }
-        if (data.chargeTimeType.value === 'Annual Fee' || data.chargeTimeType.value === 'Monthly Fee') {
-          this.chargeDetails.chargeTimeTypeAnnualOrMonth = true;
-        }
-        if (!this.chargeDetails.dueDateNotRequired && !this.chargeDetails.chargeTimeTypeAnnualOrMonth) {
-          this.clientChargeForm.addControl('dueDate', new UntypedFormControl('', Validators.required));
-        } else {
-          this.clientChargeForm.removeControl('dueDate');
-        }
-        if (!this.chargeDetails.dueDateNotRequired && this.chargeDetails.chargeTimeTypeAnnualOrMonth) {
-          this.clientChargeForm.addControl('feeOnMonthDay', new UntypedFormControl('', Validators.required));
-        } else {
-          this.clientChargeForm.removeControl('feeOnMonthDay');
-        }
-        if (chargeTimeType.value === 'Monthly Fee') {
-          this.clientChargeForm.addControl(
-            'feeInterval',
-            new UntypedFormControl(data.feeInterval, Validators.required)
-          );
-        } else {
-          this.clientChargeForm.removeControl('feeInterval');
-        }
-        this.clientChargeForm.patchValue({
-          amount: data.amount,
-          chargeCalculationType: data.chargeCalculationType.id,
-          chargeTimeType: data.chargeTimeType.id
+    this.clientChargeForm.controls.chargeId.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((chargeId) => {
+      this.clientsService
+        .getChargeAndTemplate(chargeId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe((data: any) => {
+          this.chargeDetails = data;
+          const chargeTimeType = data.chargeTimeType.id;
+          if (
+            data.chargeTimeType.value === 'Withdrawal Fee' ||
+            data.chargeTimeType.value === 'Saving No Activity Fee'
+          ) {
+            this.chargeDetails.dueDateNotRequired = true;
+          }
+          if (data.chargeTimeType.value === 'Annual Fee' || data.chargeTimeType.value === 'Monthly Fee') {
+            this.chargeDetails.chargeTimeTypeAnnualOrMonth = true;
+          }
+          if (!this.chargeDetails.dueDateNotRequired && !this.chargeDetails.chargeTimeTypeAnnualOrMonth) {
+            this.clientChargeForm.addControl('dueDate', new UntypedFormControl('', Validators.required));
+          } else {
+            this.clientChargeForm.removeControl('dueDate');
+          }
+          if (!this.chargeDetails.dueDateNotRequired && this.chargeDetails.chargeTimeTypeAnnualOrMonth) {
+            this.clientChargeForm.addControl('feeOnMonthDay', new UntypedFormControl('', Validators.required));
+          } else {
+            this.clientChargeForm.removeControl('feeOnMonthDay');
+          }
+          if (chargeTimeType.value === 'Monthly Fee') {
+            this.clientChargeForm.addControl(
+              'feeInterval',
+              new UntypedFormControl(data.feeInterval, Validators.required)
+            );
+          } else {
+            this.clientChargeForm.removeControl('feeInterval');
+          }
+          this.clientChargeForm.patchValue({
+            amount: data.amount,
+            chargeCalculationType: data.chargeCalculationType.id,
+            chargeTimeType: data.chargeTimeType.id
+          });
         });
-      });
     });
   }
 
@@ -162,8 +170,16 @@ export class AddClientChargeComponent implements OnInit {
         }
       }
     }
-    this.clientsService.createClientCharge(this.clientId, clientCharge).subscribe(() => {
-      this.router.navigate(['../../'], { relativeTo: this.route });
-    });
+    this.clientsService
+      .createClientCharge(this.clientId, clientCharge)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.router.navigate(['../../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

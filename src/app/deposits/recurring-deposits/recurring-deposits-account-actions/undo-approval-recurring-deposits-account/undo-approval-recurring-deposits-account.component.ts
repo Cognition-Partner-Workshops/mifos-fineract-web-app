@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -15,6 +15,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { RecurringDepositsService } from '../../recurring-deposits.service';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Undo Approval Recurring Deposits Account Component
@@ -28,7 +29,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class UndoApprovalRecurringDepositsAccountComponent implements OnInit {
+export class UndoApprovalRecurringDepositsAccountComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private recurringDepositsService = inject(RecurringDepositsService);
   private route = inject(ActivatedRoute);
@@ -84,15 +86,22 @@ export class UndoApprovalRecurringDepositsAccountComponent implements OnInit {
     if (this.undoAction === 'Undo Activation') {
       this.recurringDepositsService
         .executeRecurringDepositsAccountCommand(this.accountId, this.undoCommand, data)
+        .pipe(takeUntil(this.destroy$))
         .subscribe(() => {
           this.router.navigate(['../../'], { relativeTo: this.route });
         });
     } else {
       this.recurringDepositsService
         .executeRecurringDepositsAccountCommand(this.accountId, 'undoapproval', data)
+        .pipe(takeUntil(this.destroy$))
         .subscribe(() => {
           this.router.navigate(['../../'], { relativeTo: this.route });
         });
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

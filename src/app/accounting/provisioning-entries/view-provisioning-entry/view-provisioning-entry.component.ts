@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatPaginator } from '@angular/material/paginator';
@@ -27,7 +27,7 @@ import {
 } from '@angular/material/table';
 
 /** rxjs Imports */
-import { startWith, map, debounceTime, distinctUntilChanged, tap } from 'rxjs/operators';
+import { startWith, map, debounceTime, distinctUntilChanged, tap, takeUntil } from 'rxjs/operators';
 
 /** Custom Services */
 import { AccountingService } from '../../accounting.service';
@@ -35,6 +35,7 @@ import { AsyncPipe } from '@angular/common';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatAutocompleteTrigger, MatAutocomplete, MatOption } from '@angular/material/autocomplete';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject } from 'rxjs';
 
 /**
  * View provisioning entry component.
@@ -64,7 +65,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     AsyncPipe
   ]
 })
-export class ViewProvisioningEntryComponent implements OnInit, AfterViewInit {
+export class ViewProvisioningEntryComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -125,22 +127,24 @@ export class ViewProvisioningEntryComponent implements OnInit, AfterViewInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe(
-      (data: {
-        provisioningEntry: any;
-        provisioningEntryEntries: any;
-        offices: any;
-        loanProducts: any;
-        provisiningCategories: any;
-      }) => {
-        this.provisioningEntryId = data.provisioningEntry.id;
-        this.provisioningEntry = data.provisioningEntry;
-        this.provisioningEntryEntries = data.provisioningEntryEntries;
-        this.officeData = data.offices;
-        this.loanProductData = data.loanProducts;
-        this.provisioningCategoryData = data.provisiningCategories;
-      }
-    );
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        (data: {
+          provisioningEntry: any;
+          provisioningEntryEntries: any;
+          offices: any;
+          loanProducts: any;
+          provisiningCategories: any;
+        }) => {
+          this.provisioningEntryId = data.provisioningEntry.id;
+          this.provisioningEntry = data.provisioningEntry;
+          this.provisioningEntryEntries = data.provisioningEntryEntries;
+          this.officeData = data.offices;
+          this.loanProductData = data.loanProducts;
+          this.provisioningCategoryData = data.provisiningCategories;
+        }
+      );
   }
 
   /**
@@ -168,6 +172,7 @@ export class ViewProvisioningEntryComponent implements OnInit, AfterViewInit {
           this.applyFilter(filterValue, 'officeName');
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
     this.loanProduct.valueChanges
@@ -179,6 +184,7 @@ export class ViewProvisioningEntryComponent implements OnInit, AfterViewInit {
           this.applyFilter(filterValue, 'productName');
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
     this.provisioningCategory.valueChanges
@@ -190,6 +196,7 @@ export class ViewProvisioningEntryComponent implements OnInit, AfterViewInit {
           this.applyFilter(filterValue, 'categoryName');
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
   }
 
@@ -304,14 +311,22 @@ export class ViewProvisioningEntryComponent implements OnInit, AfterViewInit {
    * and redirects to created entries.
    */
   createProvisioningJournalEntries() {
-    this.accountingService.createProvisioningJournalEntries(this.provisioningEntryId).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../../journal-entries/view',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.accountingService
+      .createProvisioningJournalEntries(this.provisioningEntryId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../../journal-entries/view',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

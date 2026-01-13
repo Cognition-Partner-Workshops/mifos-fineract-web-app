@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -24,6 +24,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatFormField, MatLabel, MatError, MatSuffix, MatHint } from '@angular/material/form-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Center Meetings Component
@@ -38,7 +39,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatHint
   ]
 })
-export class EditCenterMeetingComponent implements OnInit {
+export class EditCenterMeetingComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private centersService = inject(CentersService);
   private settingsService = inject(SettingsService);
@@ -75,7 +77,7 @@ export class EditCenterMeetingComponent implements OnInit {
    * @param {Router} router Router
    */
   constructor() {
-    this.route.data.subscribe((data: { centersActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { centersActionData: any }) => {
       this.calendarTemplate = data.centersActionData;
       this.frequencyOptions = this.calendarTemplate.frequencyOptions;
       this.repeatsOnDays = this.calendarTemplate.repeatsOnDayOptions;
@@ -114,51 +116,54 @@ export class EditCenterMeetingComponent implements OnInit {
    * Subscribes to value changes of controls.
    */
   buildDependencies() {
-    this.centerEditMeetingForm.get('frequency').valueChanges.subscribe((frequency: any) => {
-      this.centerEditMeetingForm.removeControl('repeatsOnDay');
-      switch (frequency) {
-        case 1: // Daily
-          this.repetitionIntervals = [
-            '1',
-            '2',
-            '3'
-          ];
-          break;
-        case 2: // Weekly
-          this.repetitionIntervals = [
-            '1',
-            '2',
-            '3'
-          ];
-          this.centerEditMeetingForm.addControl('repeatsOnDay', new UntypedFormControl('', Validators.required));
-          this.centerEditMeetingForm.get('repeatsOnDay').patchValue(this.calendarTemplate.repeatsOnDay.id);
-          break;
-        case 3: // Monthly
-          this.repetitionIntervals = [
-            '1',
-            '2',
-            '3',
-            '4',
-            '5',
-            '6',
-            '7',
-            '8',
-            '9',
-            '10',
-            '11'
-          ];
-          break;
-        case 4: // Yearly
-          this.repetitionIntervals = [
-            '1',
-            '2',
-            '3',
-            '4',
-            '5'
-          ];
-          break;
-      }
-    });
+    this.centerEditMeetingForm
+      .get('frequency')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((frequency: any) => {
+        this.centerEditMeetingForm.removeControl('repeatsOnDay');
+        switch (frequency) {
+          case 1: // Daily
+            this.repetitionIntervals = [
+              '1',
+              '2',
+              '3'
+            ];
+            break;
+          case 2: // Weekly
+            this.repetitionIntervals = [
+              '1',
+              '2',
+              '3'
+            ];
+            this.centerEditMeetingForm.addControl('repeatsOnDay', new UntypedFormControl('', Validators.required));
+            this.centerEditMeetingForm.get('repeatsOnDay').patchValue(this.calendarTemplate.repeatsOnDay.id);
+            break;
+          case 3: // Monthly
+            this.repetitionIntervals = [
+              '1',
+              '2',
+              '3',
+              '4',
+              '5',
+              '6',
+              '7',
+              '8',
+              '9',
+              '10',
+              '11'
+            ];
+            break;
+          case 4: // Yearly
+            this.repetitionIntervals = [
+              '1',
+              '2',
+              '3',
+              '4',
+              '5'
+            ];
+            break;
+        }
+      });
     this.centerEditMeetingForm.patchValue({
       startDate: this.calendarTemplate.startDate && new Date(this.calendarTemplate.startDate),
       frequency: this.calendarTemplate.frequency.id,
@@ -195,8 +200,16 @@ export class EditCenterMeetingComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.centersService.updateCenterMeeting(this.centerId, data, this.calendarId).subscribe((response: any) => {
-      this.router.navigate(['../../'], { relativeTo: this.route });
-    });
+    this.centersService
+      .updateCenterMeeting(this.centerId, data, this.calendarId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

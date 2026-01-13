@@ -7,10 +7,11 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { EntityDatatableTabComponent } from '../../../../shared/tabs/entity-datatable-tab/entity-datatable-tab.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Savings Datatable Tabs Component
@@ -24,7 +25,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     EntityDatatableTabComponent
   ]
 })
-export class DatatableTabsComponent {
+export class DatatableTabsComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   entityId: string;
@@ -40,9 +42,14 @@ export class DatatableTabsComponent {
   constructor() {
     this.entityId = this.route.parent.parent.snapshot.paramMap.get('recurringDepositAccountId');
 
-    this.route.data.subscribe((data: { savingsDatatable: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { savingsDatatable: any }) => {
       this.entityDatatable = data.savingsDatatable;
       this.multiRowDatatableFlag = this.entityDatatable.columnHeaders[0].columnName === 'id' ? true : false;
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

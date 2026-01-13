@@ -7,13 +7,14 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 /** Custom Services */
 import { ClientsService } from 'app/clients/clients.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Clients Update Savings Account Component
@@ -26,7 +27,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class UpdateClientSavingsAccountComponent implements OnInit {
+export class UpdateClientSavingsAccountComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private clientsService = inject(ClientsService);
   private route = inject(ActivatedRoute);
@@ -47,7 +49,7 @@ export class UpdateClientSavingsAccountComponent implements OnInit {
    * @param {Router} router Router
    */
   constructor() {
-    this.route.data.subscribe((data: { clientActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientActionData: any }) => {
       this.clientData = data.clientActionData;
     });
   }
@@ -72,8 +74,14 @@ export class UpdateClientSavingsAccountComponent implements OnInit {
   submit() {
     this.clientsService
       .executeClientCommand(this.clientData.id, 'updateSavingsAccount', this.clientSavingsAccountForm.value)
+      .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.router.navigate(['../../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

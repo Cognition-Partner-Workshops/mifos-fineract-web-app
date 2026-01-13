@@ -7,11 +7,12 @@
  */
 
 /** Angular Imports. */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Tax Group component.
@@ -26,7 +27,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ViewTaxGroupComponent {
+export class ViewTaxGroupComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** tax Group Data. */
@@ -37,8 +39,13 @@ export class ViewTaxGroupComponent {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { taxGroup: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { taxGroup: any }) => {
       this.taxGroupData = data.taxGroup;
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

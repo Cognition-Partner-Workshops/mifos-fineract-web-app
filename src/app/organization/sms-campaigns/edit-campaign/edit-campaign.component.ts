@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, ViewChild, inject } from '@angular/core';
+import { Component, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Dates } from 'app/core/utils/dates';
 
@@ -22,6 +22,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { EditSmsCampaignStepComponent } from '../sms-campaign-stepper/edit-sms-campaign-step/edit-sms-campaign-step.component';
 import { CampaignPreviewStepComponent } from '../sms-campaign-stepper/campaign-preview-step/campaign-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Campaign Component
@@ -42,7 +43,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CampaignPreviewStepComponent
   ]
 })
-export class EditCampaignComponent {
+export class EditCampaignComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private dateUtils = inject(Dates);
@@ -68,7 +70,7 @@ export class EditCampaignComponent {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { smsCampaign: any; smsCampaignTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { smsCampaign: any; smsCampaignTemplate: any }) => {
       this.smsCampaignTemplate = data.smsCampaignTemplate;
       this.smsCampaign = data.smsCampaign;
       this.smsCampaign.editFlag = true;
@@ -117,8 +119,16 @@ export class EditCampaignComponent {
         dateTimeFormat
       );
     }
-    this.organizationService.updateSmsCampaign(smsCampaign, this.smsCampaign.id).subscribe((response: any) => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.organizationService
+      .updateSmsCampaign(smsCampaign, this.smsCampaign.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

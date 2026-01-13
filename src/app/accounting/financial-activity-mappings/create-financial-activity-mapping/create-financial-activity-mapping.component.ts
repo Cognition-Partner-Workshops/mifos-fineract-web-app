@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -16,6 +16,7 @@ import { AccountingService } from '../../accounting.service';
 import { GLAccount } from 'app/shared/models/general.model';
 import { GlAccountSelectorComponent } from '../../../shared/accounting/gl-account-selector/gl-account-selector.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create financial activity mapping component.
@@ -29,7 +30,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     GlAccountSelectorComponent
   ]
 })
-export class CreateFinancialActivityMappingComponent implements OnInit {
+export class CreateFinancialActivityMappingComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
@@ -52,7 +54,7 @@ export class CreateFinancialActivityMappingComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { financialActivityAccountsTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { financialActivityAccountsTemplate: any }) => {
       this.glAccountOptions = data.financialActivityAccountsTemplate.glAccountOptions;
       this.financialActivityData = data.financialActivityAccountsTemplate.financialActivityOptions;
     });
@@ -86,23 +88,26 @@ export class CreateFinancialActivityMappingComponent implements OnInit {
    * Sets the gl account data on the basis of selected financial activity.
    */
   setGlAccountData() {
-    this.financialActivityMappingForm.get('financialActivityId').valueChanges.subscribe((financialActivityId) => {
-      switch (financialActivityId) {
-        case 100:
-        case 101:
-        case 102:
-        case 103:
-          this.glAccountData = this.glAccountOptions.assetAccountOptions;
-          break;
-        case 200:
-        case 201:
-          this.glAccountData = this.glAccountOptions.liabilityAccountOptions;
-          break;
-        case 300:
-          this.glAccountData = this.glAccountOptions.equityAccountOptions;
-          break;
-      }
-    });
+    this.financialActivityMappingForm
+      .get('financialActivityId')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((financialActivityId) => {
+        switch (financialActivityId) {
+          case 100:
+          case 101:
+          case 102:
+          case 103:
+            this.glAccountData = this.glAccountOptions.assetAccountOptions;
+            break;
+          case 200:
+          case 201:
+            this.glAccountData = this.glAccountOptions.liabilityAccountOptions;
+            break;
+          case 300:
+            this.glAccountData = this.glAccountOptions.equityAccountOptions;
+            break;
+        }
+      });
   }
 
   /**
@@ -112,6 +117,7 @@ export class CreateFinancialActivityMappingComponent implements OnInit {
   submit() {
     this.accountingService
       .createFinancialActivityAccount(this.financialActivityMappingForm.value)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: any) => {
         this.router.navigate(
           [
@@ -121,5 +127,10 @@ export class CreateFinancialActivityMappingComponent implements OnInit {
           { relativeTo: this.route }
         );
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 import { CdkDragDrop, moveItemInArray, CdkDropList, CdkDrag } from '@angular/cdk/drag-drop';
-import { Component, EventEmitter, Input, OnInit, Output, ViewChild, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, ViewChild, inject, OnDestroy } from '@angular/core';
 import { UntypedFormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import {
@@ -35,6 +35,7 @@ import {
 } from '../payment-allocation-model';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-advance-payment-allocation-tab',
@@ -57,7 +58,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkDrag
   ]
 })
-export class AdvancePaymentAllocationTabComponent implements OnInit {
+export class AdvancePaymentAllocationTabComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private dialog = inject(MatDialog);
   private advancedPaymentStrategy = inject(AdvancedPaymentStrategy);
   private translateService = inject(TranslateService);
@@ -95,7 +97,7 @@ export class AdvancePaymentAllocationTabComponent implements OnInit {
           this.advancedPaymentAllocation.futureInstallmentAllocationRule.code
         );
       }
-      this.futureInstallmentAllocationRule.valueChanges.subscribe((value: any) => {
+      this.futureInstallmentAllocationRule.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((value: any) => {
         this.advancedPaymentAllocation.futureInstallmentAllocationRules.forEach(
           (item: FutureInstallmentAllocationRule) => {
             if (value === item.code) {
@@ -147,10 +149,18 @@ export class AdvancePaymentAllocationTabComponent implements OnInit {
           this.translateService.instant('labels.dialogContext.the Transaction Type') + ' ' + transaction.value
       }
     });
-    dialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.transactionTypeRemoved.emit(transaction);
-      }
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.transactionTypeRemoved.emit(transaction);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

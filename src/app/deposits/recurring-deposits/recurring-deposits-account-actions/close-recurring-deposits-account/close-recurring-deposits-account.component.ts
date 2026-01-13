@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -23,6 +23,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Close Recurring Deposits Account Component
@@ -36,7 +37,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class CloseRecurringDepositsAccountComponent implements OnInit {
+export class CloseRecurringDepositsAccountComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -74,7 +76,7 @@ export class CloseRecurringDepositsAccountComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositsAccountActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountActionData: any }) => {
       this.savingsAccountsData = data.recurringDepositsAccountActionData.savingsAccounts;
       this.maturityAmount = data.recurringDepositsAccountActionData.maturityAmount;
       this.onAccountClosureOptions = data.recurringDepositsAccountActionData.onAccountClosureOptions;
@@ -128,18 +130,21 @@ export class CloseRecurringDepositsAccountComponent implements OnInit {
     this.showPaymentDetails = !this.showPaymentDetails;
   }
   addTransferDetails() {
-    this.closeRecurringDepositForm.get('onAccountClosureId').valueChanges.subscribe((id: any) => {
-      if (id === 200) {
-        this.closeRecurringDepositForm.addControl(
-          'toSavingsAccountId',
-          new UntypedFormControl('', Validators.required)
-        );
-        this.closeRecurringDepositForm.addControl('transferDescription', new UntypedFormControl(''));
-      } else {
-        this.closeRecurringDepositForm.removeControl('toSavingsAccountId');
-        this.closeRecurringDepositForm.removeControl('transferDescription');
-      }
-    });
+    this.closeRecurringDepositForm
+      .get('onAccountClosureId')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((id: any) => {
+        if (id === 200) {
+          this.closeRecurringDepositForm.addControl(
+            'toSavingsAccountId',
+            new UntypedFormControl('', Validators.required)
+          );
+          this.closeRecurringDepositForm.addControl('transferDescription', new UntypedFormControl(''));
+        } else {
+          this.closeRecurringDepositForm.removeControl('toSavingsAccountId');
+          this.closeRecurringDepositForm.removeControl('transferDescription');
+        }
+      });
   }
 
   /**
@@ -160,8 +165,14 @@ export class CloseRecurringDepositsAccountComponent implements OnInit {
     };
     this.recurringDepositsService
       .executeRecurringDepositsAccountCommand(this.accountId, 'close', data)
+      .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.router.navigate(['../../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

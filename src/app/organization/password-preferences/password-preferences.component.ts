@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -15,6 +15,7 @@ import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { OrganizationService } from '../organization.service';
 import { MatRadioGroup, MatRadioButton } from '@angular/material/radio';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Password preferences component.
@@ -29,7 +30,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatRadioButton
   ]
 })
-export class PasswordPreferencesComponent implements OnInit {
+export class PasswordPreferencesComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
   private route = inject(ActivatedRoute);
@@ -48,7 +50,7 @@ export class PasswordPreferencesComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { passwordPreferencesTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { passwordPreferencesTemplate: any }) => {
       this.passwordPreferencesData = data.passwordPreferencesTemplate;
     });
   }
@@ -87,8 +89,16 @@ export class PasswordPreferencesComponent implements OnInit {
    */
   submit() {
     const passwordPreferences = this.passwordPreferencesForm.value;
-    this.organizationService.updatePasswordPreferences(passwordPreferences).subscribe((response: any) => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.organizationService
+      .updatePasswordPreferences(passwordPreferences)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

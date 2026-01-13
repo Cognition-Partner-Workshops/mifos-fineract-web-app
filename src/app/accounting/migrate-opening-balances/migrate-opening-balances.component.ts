@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -30,6 +30,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { CurrencyPipe } from '@angular/common';
 import { GlAccountDisplayComponent } from '../../shared/accounting/gl-account-display/gl-account-display.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Migrate opening balances component.
@@ -44,7 +45,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CurrencyPipe
   ]
 })
-export class MigrateOpeningBalancesComponent implements OnInit, AfterViewInit {
+export class MigrateOpeningBalancesComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private accountingService = inject(AccountingService);
   private settingsService = inject(SettingsService);
@@ -89,7 +91,7 @@ export class MigrateOpeningBalancesComponent implements OnInit, AfterViewInit {
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { offices: any; currencies: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { offices: any; currencies: any }) => {
       this.officeData = data.offices;
       this.currencyData = data.currencies.selectedCurrencyOptions;
     });
@@ -123,9 +125,11 @@ export class MigrateOpeningBalancesComponent implements OnInit, AfterViewInit {
       glAccountEntries: this.formBuilder.array([])
     });
 
-    this.openingBalancesForm.controls.currencyCode.valueChanges.subscribe((value: string) => {
-      this.currencyCode = value;
-    });
+    this.openingBalancesForm.controls.currencyCode.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((value: string) => {
+        this.currencyCode = value;
+      });
   }
 
   /**
@@ -158,6 +162,7 @@ export class MigrateOpeningBalancesComponent implements OnInit, AfterViewInit {
   retrieveOpeningBalances() {
     this.accountingService
       .retrieveOpeningBalances(this.openingBalancesForm.value.officeId)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((openingBalancesData: any) => {
         const entry = this.openingBalancesForm.get('glAccountEntries') as UntypedFormArray;
 
@@ -174,7 +179,7 @@ export class MigrateOpeningBalancesComponent implements OnInit, AfterViewInit {
 
         this.openingBalancesData = openingBalancesData;
 
-        entry.valueChanges.subscribe(() => {
+        entry.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
           this.debitsSum = 0;
           this.creditsSum = 0;
           entry.controls.forEach((value) => {
@@ -211,12 +216,15 @@ export class MigrateOpeningBalancesComponent implements OnInit, AfterViewInit {
         }
       });
       delete openingBalances.glAccountEntries;
-      this.accountingService.defineOpeningBalances(openingBalances).subscribe((response: any) => {
-        this.router.navigate([
-          '/accounting/journal-entries/transactions/view',
-          response.transactionId
-        ]);
-      });
+      this.accountingService
+        .defineOpeningBalances(openingBalances)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe((response: any) => {
+          this.router.navigate([
+            '/accounting/journal-entries/transactions/view',
+            response.transactionId
+          ]);
+        });
     }
   }
 
@@ -279,5 +287,10 @@ export class MigrateOpeningBalancesComponent implements OnInit, AfterViewInit {
 
   glAccountTypeLabel(accountType: string): string {
     return this.translateService.instant('labels.inputs.accounting.' + accountType);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

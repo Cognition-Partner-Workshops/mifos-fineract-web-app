@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -17,6 +17,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create teller component.
@@ -30,7 +31,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class CreateTellerComponent implements OnInit {
+export class CreateTellerComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
   private settingsService = inject(SettingsService);
@@ -59,7 +61,7 @@ export class CreateTellerComponent implements OnInit {
    * @param {Dates} dateUtils Date Utils to format date.
    */
   constructor() {
-    this.route.data.subscribe((data: { offices: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { offices: any }) => {
       this.officeData = data.offices;
     });
     this.tellerStatusesData = [
@@ -126,14 +128,22 @@ export class CreateTellerComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.organizationService.createTeller(data).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.organizationService
+      .createTeller(data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

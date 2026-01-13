@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import {
@@ -41,6 +41,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { FindPipe } from '../../../pipes/find.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { TranslateService } from '@ngx-translate/core';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Loan Provisioning Criteria Component.
@@ -66,7 +67,8 @@ import { TranslateService } from '@ngx-translate/core';
     FindPipe
   ]
 })
-export class EditLoanProvisioningCriteriaComponent implements OnInit {
+export class EditLoanProvisioningCriteriaComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
   private router = inject(Router);
@@ -116,7 +118,7 @@ export class EditLoanProvisioningCriteriaComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { loanProvisioningCriteriaAndTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { loanProvisioningCriteriaAndTemplate: any }) => {
       this.loanProvisioningCriteriaAndTemplate = data.loanProvisioningCriteriaAndTemplate;
       this.definitions = this.loanProvisioningCriteriaAndTemplate.definitions;
       this.loanProducts = this.loanProvisioningCriteriaAndTemplate.loanProducts.concat(
@@ -170,16 +172,19 @@ export class EditLoanProvisioningCriteriaComponent implements OnInit {
       layout: { addButtonText: 'Confirm' }
     };
     const editDefinitionDialogRef = this.dialog.open(FormDialogComponent, { data });
-    editDefinitionDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const definitionData = {
-          ...definition,
-          ...response.data.value
-        };
-        this.definitions.splice(this.definitions.indexOf(definition), 1, definitionData);
-        this.definitions = this.definitions.concat([]);
-      }
-    });
+    editDefinitionDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const definitionData = {
+            ...definition,
+            ...response.data.value
+          };
+          this.definitions.splice(this.definitions.indexOf(definition), 1, definitionData);
+          this.definitions = this.definitions.concat([]);
+        }
+      });
   }
 
   /**
@@ -265,8 +270,14 @@ export class EditLoanProvisioningCriteriaComponent implements OnInit {
     };
     this.organizationService
       .updateProvisioningCriteria(this.loanProvisioningCriteriaAndTemplate.criteriaId, loanProvisioningCriteria)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: any) => {
         this.router.navigate(['../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

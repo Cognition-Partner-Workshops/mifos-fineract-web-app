@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
@@ -65,7 +65,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ViewBulkImportComponent implements OnInit {
+export class ViewBulkImportComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
@@ -113,7 +114,7 @@ export class ViewBulkImportComponent implements OnInit {
    */
   constructor() {
     this.bulkImport.name = this.route.snapshot.params['import-name'];
-    this.route.data.subscribe((data: any) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: any) => {
       this.officeData = data.offices;
       this.importsData = data.imports;
     });
@@ -144,13 +145,19 @@ export class ViewBulkImportComponent implements OnInit {
    * Subscribe to value changes and fetches select options accordingly.
    */
   buildDependencies() {
-    this.bulkImportForm.get('officeId').valueChanges.subscribe((value: any) => {
-      if (this.bulkImport.formFields >= 2) {
-        this.organizationService.getStaff(value).subscribe((data: any) => {
-          this.staffData = data;
-        });
-      }
-    });
+    this.bulkImportForm
+      .get('officeId')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((value: any) => {
+        if (this.bulkImport.formFields >= 2) {
+          this.organizationService
+            .getStaff(value)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe((data: any) => {
+              this.staffData = data;
+            });
+        }
+      });
   }
 
   /**
@@ -180,6 +187,7 @@ export class ViewBulkImportComponent implements OnInit {
     }
     this.organizationService
       .getImportTemplate(this.bulkImport.urlSuffix, officeId, staffId, legalFormType)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((res: any) => {
         const contentType = res.headers.get('Content-Type');
         const blob = new Blob([res.body], { type: contentType });
@@ -213,6 +221,7 @@ export class ViewBulkImportComponent implements OnInit {
     }
     this.organizationService
       .uploadImportDocument(this.template, this.bulkImport.urlSuffix, legalFormType)
+      .pipe(takeUntil(this.destroy$))
       .subscribe(() => {});
   }
 
@@ -220,10 +229,13 @@ export class ViewBulkImportComponent implements OnInit {
    * Reloads imports data table.
    */
   refreshDocuments() {
-    this.organizationService.getImports(this.bulkImport.entityType).subscribe((data: any) => {
-      this.dataSource = new MatTableDataSource(data);
-      this.importsTableRef.renderRows();
-    });
+    this.organizationService
+      .getImports(this.bulkImport.entityType)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: any) => {
+        this.dataSource = new MatTableDataSource(data);
+        this.importsTableRef.renderRows();
+      });
   }
 
   /**
@@ -232,11 +244,20 @@ export class ViewBulkImportComponent implements OnInit {
    * @param {any} id ImportID
    */
   downloadDocument(name: string, id: any) {
-    this.organizationService.getImportDocument(id).subscribe((res: any) => {
-      const contentType = res.headers.get('Content-Type');
-      const blob = new Blob([res.body], { type: contentType });
-      const fileOfBlob = new File([blob], name, { type: contentType });
-      window.open(window.URL.createObjectURL(fileOfBlob));
-    });
+    this.organizationService
+      .getImportDocument(id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((res: any) => {
+        const contentType = res.headers.get('Content-Type');
+        import { Subject, takeUntil } from 'rxjs';
+        const blob = new Blob([res.body], { type: contentType });
+        const fileOfBlob = new File([blob], name, { type: contentType });
+        window.open(window.URL.createObjectURL(fileOfBlob));
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

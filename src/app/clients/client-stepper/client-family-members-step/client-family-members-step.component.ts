@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, Input, inject } from '@angular/core';
+import { Component, Input, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
 /** Custom Components */
@@ -27,6 +27,7 @@ import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { FindPipe } from '../../../pipes/find.pipe';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Client Family Members Step
@@ -50,7 +51,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ClientFamilyMembersStepComponent {
+export class ClientFamilyMembersStepComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   dialog = inject(MatDialog);
   private translateService = inject(TranslateService);
 
@@ -70,11 +72,14 @@ export class ClientFamilyMembersStepComponent {
       },
       width: '50rem'
     });
-    addFamilyMemberDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.member) {
-        this.clientFamilyMembers.push(response.member);
-      }
-    });
+    addFamilyMemberDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.member) {
+          this.clientFamilyMembers.push(response.member);
+        }
+      });
   }
 
   /**
@@ -91,11 +96,14 @@ export class ClientFamilyMembersStepComponent {
       },
       width: '50rem'
     });
-    addFamilyMemberDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.member) {
-        this.clientFamilyMembers.splice(index, 1, response.member);
-      }
-    });
+    addFamilyMemberDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.member) {
+          this.clientFamilyMembers.splice(index, 1, response.member);
+        }
+      });
   }
 
   /**
@@ -105,11 +113,14 @@ export class ClientFamilyMembersStepComponent {
     const deleteFamilyMemberDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `Family member name : ${name} ${index}` }
     });
-    deleteFamilyMemberDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.clientFamilyMembers.splice(index, 1);
-      }
-    });
+    deleteFamilyMemberDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.clientFamilyMembers.splice(index, 1);
+        }
+      });
   }
 
   /**
@@ -117,5 +128,10 @@ export class ClientFamilyMembersStepComponent {
    */
   get familyMembers() {
     return { familyMembers: this.clientFamilyMembers };
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

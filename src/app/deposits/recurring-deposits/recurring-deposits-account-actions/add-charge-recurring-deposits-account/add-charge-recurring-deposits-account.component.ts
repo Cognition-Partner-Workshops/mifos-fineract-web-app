@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -22,6 +22,7 @@ import { Dates } from 'app/core/utils/dates';
 import { SavingsService } from 'app/savings/savings.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Add Recurring Deposits Charge component.
@@ -35,7 +36,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class AddChargeRecurringDepositsAccountComponent implements OnInit {
+export class AddChargeRecurringDepositsAccountComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -65,7 +67,7 @@ export class AddChargeRecurringDepositsAccountComponent implements OnInit {
    * @param {SavingsService} savingsService Savings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositsAccountActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountActionData: any }) => {
       this.savingsChargeOptions = data.recurringDepositsAccountActionData.chargeOptions;
     });
     this.recurringDepositAccountId = this.route.parent.snapshot.params['recurringDepositAccountId'];
@@ -81,41 +83,52 @@ export class AddChargeRecurringDepositsAccountComponent implements OnInit {
   }
 
   buildDependencies() {
-    this.recurringDepositsChargeForm.controls.chargeId.valueChanges.subscribe((chargeId) => {
-      this.savingsService.getChargeTemplate(chargeId).subscribe((data: any) => {
-        this.chargeDetails = data;
-        const chargeTimeType = data.chargeTimeType.id;
-        if (data.chargeTimeType.value === 'Withdrawal Fee' || data.chargeTimeType.value === 'Saving No Activity Fee') {
-          this.chargeDetails.dueDateNotRequired = true;
-        }
-        if (data.chargeTimeType.value === 'Annual Fee' || data.chargeTimeType.value === 'Monthly Fee') {
-          this.chargeDetails.chargeTimeTypeAnnualOrMonth = true;
-        }
-        if (!this.chargeDetails.dueDateNotRequired && !this.chargeDetails.chargeTimeTypeAnnualOrMonth) {
-          this.recurringDepositsChargeForm.addControl('dueDate', new UntypedFormControl('', Validators.required));
-        } else {
-          this.recurringDepositsChargeForm.removeControl('dueDate');
-        }
-        if (!this.chargeDetails.dueDateNotRequired && this.chargeDetails.chargeTimeTypeAnnualOrMonth) {
-          this.recurringDepositsChargeForm.addControl('feeOnMonthDay', new UntypedFormControl('', Validators.required));
-        } else {
-          this.recurringDepositsChargeForm.removeControl('feeOnMonthDay');
-        }
-        if (chargeTimeType.value === 'Monthly Fee') {
-          this.recurringDepositsChargeForm.addControl(
-            'feeInterval',
-            new UntypedFormControl(data.feeInterval, Validators.required)
-          );
-        } else {
-          this.recurringDepositsChargeForm.removeControl('feeInterval');
-        }
-        this.recurringDepositsChargeForm.patchValue({
-          amount: data.amount,
-          chargeCalculationType: data.chargeCalculationType.id,
-          chargeTimeType: data.chargeTimeType.id
-        });
+    this.recurringDepositsChargeForm.controls.chargeId.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((chargeId) => {
+        this.savingsService
+          .getChargeTemplate(chargeId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((data: any) => {
+            this.chargeDetails = data;
+            const chargeTimeType = data.chargeTimeType.id;
+            if (
+              data.chargeTimeType.value === 'Withdrawal Fee' ||
+              data.chargeTimeType.value === 'Saving No Activity Fee'
+            ) {
+              this.chargeDetails.dueDateNotRequired = true;
+            }
+            if (data.chargeTimeType.value === 'Annual Fee' || data.chargeTimeType.value === 'Monthly Fee') {
+              this.chargeDetails.chargeTimeTypeAnnualOrMonth = true;
+            }
+            if (!this.chargeDetails.dueDateNotRequired && !this.chargeDetails.chargeTimeTypeAnnualOrMonth) {
+              this.recurringDepositsChargeForm.addControl('dueDate', new UntypedFormControl('', Validators.required));
+            } else {
+              this.recurringDepositsChargeForm.removeControl('dueDate');
+            }
+            if (!this.chargeDetails.dueDateNotRequired && this.chargeDetails.chargeTimeTypeAnnualOrMonth) {
+              this.recurringDepositsChargeForm.addControl(
+                'feeOnMonthDay',
+                new UntypedFormControl('', Validators.required)
+              );
+            } else {
+              this.recurringDepositsChargeForm.removeControl('feeOnMonthDay');
+            }
+            if (chargeTimeType.value === 'Monthly Fee') {
+              this.recurringDepositsChargeForm.addControl(
+                'feeInterval',
+                new UntypedFormControl(data.feeInterval, Validators.required)
+              );
+            } else {
+              this.recurringDepositsChargeForm.removeControl('feeInterval');
+            }
+            this.recurringDepositsChargeForm.patchValue({
+              amount: data.amount,
+              chargeCalculationType: data.chargeCalculationType.id,
+              chargeTimeType: data.chargeTimeType.id
+            });
+          });
       });
-    });
   }
 
   /**
@@ -162,8 +175,16 @@ export class AddChargeRecurringDepositsAccountComponent implements OnInit {
         }
       }
     }
-    this.savingsService.createSavingsCharge(this.recurringDepositAccountId, 'charges', savingsCharge).subscribe(() => {
-      this.router.navigate(['../../'], { relativeTo: this.route });
-    });
+    this.savingsService
+      .createSavingsCharge(this.recurringDepositAccountId, 'charges', savingsCharge)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.router.navigate(['../../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

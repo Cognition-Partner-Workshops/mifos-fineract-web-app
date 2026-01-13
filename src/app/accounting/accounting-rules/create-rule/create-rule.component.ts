@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
@@ -22,6 +22,7 @@ import { MatRadioGroup, MatRadioButton } from '@angular/material/radio';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create accounting rule component.
@@ -38,7 +39,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class CreateRuleComponent implements OnInit {
+export class CreateRuleComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
@@ -58,7 +60,7 @@ export class CreateRuleComponent implements OnInit {
   creditTagData: any;
 
   constructor() {
-    this.route.data.subscribe((data: { accountingRulesTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { accountingRulesTemplate: any }) => {
       this.officeData = data.accountingRulesTemplate.allowedOffices;
       this.glAccountData = data.accountingRulesTemplate.allowedAccounts;
       this.debitTagData = data.accountingRulesTemplate.allowedDebitTagOptions;
@@ -106,24 +108,30 @@ export class CreateRuleComponent implements OnInit {
    * Sets accounting rule form for selected accounting rule type.
    */
   setAccountingRulesForm() {
-    this.accountingRuleForm.get('debitRuleType').valueChanges.subscribe((debitRuleType: string) => {
-      if (debitRuleType === 'fixedAccount') {
-        this.accountingRuleForm.get('debitTags').reset();
-        this.accountingRuleForm.get('allowMultipleDebitEntries').reset();
-      } else {
-        this.accountingRuleForm.get('accountToDebit').reset();
-        this.accountingRuleForm.get('allowMultipleDebitEntries').setValue(false);
-      }
-    });
-    this.accountingRuleForm.get('creditRuleType').valueChanges.subscribe((creditRuleType: string) => {
-      if (creditRuleType === 'fixedAccount') {
-        this.accountingRuleForm.get('creditTags').reset();
-        this.accountingRuleForm.get('allowMultipleCreditEntries').reset();
-      } else {
-        this.accountingRuleForm.get('accountToCredit').reset();
-        this.accountingRuleForm.get('allowMultipleCreditEntries').setValue(false);
-      }
-    });
+    this.accountingRuleForm
+      .get('debitRuleType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((debitRuleType: string) => {
+        if (debitRuleType === 'fixedAccount') {
+          this.accountingRuleForm.get('debitTags').reset();
+          this.accountingRuleForm.get('allowMultipleDebitEntries').reset();
+        } else {
+          this.accountingRuleForm.get('accountToDebit').reset();
+          this.accountingRuleForm.get('allowMultipleDebitEntries').setValue(false);
+        }
+      });
+    this.accountingRuleForm
+      .get('creditRuleType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((creditRuleType: string) => {
+        if (creditRuleType === 'fixedAccount') {
+          this.accountingRuleForm.get('creditTags').reset();
+          this.accountingRuleForm.get('allowMultipleCreditEntries').reset();
+        } else {
+          this.accountingRuleForm.get('accountToCredit').reset();
+          this.accountingRuleForm.get('allowMultipleCreditEntries').setValue(false);
+        }
+      });
   }
 
   /**
@@ -146,42 +154,50 @@ export class CreateRuleComponent implements OnInit {
     }
     delete accountingRule.debitRuleType;
     delete accountingRule.creditRuleType;
-    this.accountingService.createAccountingRule(accountingRule).subscribe({
-      next: (response: any) => {
-        this.router.navigate(
-          [
-            '../view',
-            response.resourceId
-          ],
-          { relativeTo: this.route }
-        );
-      },
-      error: (err) => {
-        const duplicateMsg = this.translateService.instant('errors.accountingRule.duplicateName');
-        if (
-          err?.error?.defaultUserMessage?.includes('Duplicate entry') ||
-          (typeof err?.error?.message === 'string' && err.error.message.includes('Duplicate entry')) ||
-          (typeof err?.error === 'string' && err.error.includes('Duplicate entry'))
-        ) {
-          this.snackBar.open(duplicateMsg, 'Close', {
-            duration: 7000,
-            verticalPosition: 'top',
-            horizontalPosition: 'right',
-            panelClass: 'custom-snackbar-top-right'
-          });
-        } else {
-          this.snackBar.open(
-            err?.error?.defaultUserMessage || err?.error?.message || 'An error occurred. Please try again.',
-            'Close',
-            {
+    this.accountingService
+      .createAccountingRule(accountingRule)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response: any) => {
+          this.router.navigate(
+            [
+              '../view',
+              response.resourceId
+            ],
+            { relativeTo: this.route }
+          );
+        },
+        error: (err) => {
+          const duplicateMsg = this.translateService.instant('errors.accountingRule.duplicateName');
+          if (
+            err?.error?.defaultUserMessage?.includes('Duplicate entry') ||
+            (typeof err?.error?.message === 'string' && err.error.message.includes('Duplicate entry')) ||
+            (typeof err?.error === 'string' && err.error.includes('Duplicate entry'))
+          ) {
+            this.snackBar.open(duplicateMsg, 'Close', {
               duration: 7000,
               verticalPosition: 'top',
               horizontalPosition: 'right',
               panelClass: 'custom-snackbar-top-right'
-            }
-          );
+            });
+          } else {
+            this.snackBar.open(
+              err?.error?.defaultUserMessage || err?.error?.message || 'An error occurred. Please try again.',
+              'Close',
+              {
+                duration: 7000,
+                verticalPosition: 'top',
+                horizontalPosition: 'right',
+                panelClass: 'custom-snackbar-top-right'
+              }
+            );
+          }
         }
-      }
-    });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

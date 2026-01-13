@@ -6,11 +6,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, EventEmitter, Input, OnInit, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, ReactiveFormsModule } from '@angular/forms';
 import { StringEnumOptionData } from '../../../../shared/models/option-data.model';
 import { MatTooltip } from '@angular/material/tooltip';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-loan-product-interest-refund-step',
@@ -21,7 +22,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatTooltip
   ]
 })
-export class LoanProductInterestRefundStepComponent implements OnInit {
+export class LoanProductInterestRefundStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
 
   @Input() loanProductsTemplate: any;
@@ -53,11 +55,14 @@ export class LoanProductInterestRefundStepComponent implements OnInit {
   }
 
   setConditionalControls() {
-    this.loanProductInterestRefundForm.get('supportedInterestRefundTypes').valueChanges.subscribe((value) => {
-      this.supportedInterestRefundTypes.emit(
-        this.mapIdToStringEnumOptionList(value, this.loanProductsTemplate.supportedInterestRefundTypesOptions)
-      );
-    });
+    this.loanProductInterestRefundForm
+      .get('supportedInterestRefundTypes')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((value) => {
+        this.supportedInterestRefundTypes.emit(
+          this.mapIdToStringEnumOptionList(value, this.loanProductsTemplate.supportedInterestRefundTypesOptions)
+        );
+      });
   }
 
   mapStringEnumOptionToIdList(incomingValues: StringEnumOptionData[]): string[] {
@@ -69,5 +74,10 @@ export class LoanProductInterestRefundStepComponent implements OnInit {
 
   mapIdToStringEnumOptionList(incomingValues: string[], options: StringEnumOptionData[]): StringEnumOptionData[] {
     return options.filter((v) => incomingValues.includes(v.id));
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -33,6 +33,7 @@ import {
 import { MatTooltip } from '@angular/material/tooltip';
 import { FindPipe } from '../../../../pipes/find.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-create-bucket',
@@ -56,7 +57,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FindPipe
   ]
 })
-export class CreateBucketComponent implements OnInit {
+export class CreateBucketComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private productsService = inject(ProductsService);
   private router = inject(Router);
@@ -83,7 +85,7 @@ export class CreateBucketComponent implements OnInit {
   ];
 
   constructor() {
-    this.route.data.subscribe((data: { delinquencyRanges: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { delinquencyRanges: any }) => {
       this.delinquencyRangesData = data.delinquencyRanges;
       this.delinquencyRangesData = this.delinquencyRangesData.sort(
         (objA: { minimumAgeDays: number }, objB: { minimumAgeDays: number }) =>
@@ -134,12 +136,15 @@ export class CreateBucketComponent implements OnInit {
       formfields: formfields
     };
     const rangeDialogRef = this.dialog.open(FormDialogComponent, { data });
-    rangeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        this.rangesDataSource = this.rangesDataSource.concat(response.data.value);
-        this.delinquencyRangesIds.push(response.data.value.rangeId);
-      }
-    });
+    rangeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          this.rangesDataSource = this.rangesDataSource.concat(response.data.value);
+          this.delinquencyRangesIds.push(response.data.value.rangeId);
+        }
+      });
   }
 
   /**
@@ -149,13 +154,16 @@ export class CreateBucketComponent implements OnInit {
     const dialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: this.translateService.instant('labels.text.this') }
     });
-    dialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.delinquencyRangesIds.splice(index, 1);
-        this.rangesDataSource.splice(index, 1);
-        this.rangesDataSource = this.rangesDataSource.concat([]);
-      }
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.delinquencyRangesIds.splice(index, 1);
+          this.rangesDataSource.splice(index, 1);
+          this.rangesDataSource = this.rangesDataSource.concat([]);
+        }
+      });
   }
 
   /**
@@ -173,15 +181,23 @@ export class CreateBucketComponent implements OnInit {
         ranges: ranges
       };
 
-      this.productsService.createDelinquencyBucket(data).subscribe((response: any) => {
-        this.router.navigate(
-          [
-            '../',
-            response.resourceId
-          ],
-          { relativeTo: this.route }
-        );
-      });
+      this.productsService
+        .createDelinquencyBucket(data)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe((response: any) => {
+          this.router.navigate(
+            [
+              '../',
+              response.resourceId
+            ],
+            { relativeTo: this.route }
+          );
+        });
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

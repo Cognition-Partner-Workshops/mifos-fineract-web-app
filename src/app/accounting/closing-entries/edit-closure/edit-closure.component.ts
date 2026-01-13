@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -15,6 +15,7 @@ import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { AccountingService } from '../../accounting.service';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit closure component.
@@ -28,7 +29,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class EditClosureComponent implements OnInit {
+export class EditClosureComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
@@ -49,7 +51,7 @@ export class EditClosureComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { glAccountClosure: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { glAccountClosure: any }) => {
       this.glAccountClosure = data.glAccountClosure;
     });
   }
@@ -96,6 +98,7 @@ export class EditClosureComponent implements OnInit {
   submit() {
     this.accountingService
       .updateAccountingClosure(this.glAccountClosure.id, { comments: this.accountingClosureForm.value.comments })
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: any) => {
         this.router.navigate(
           [
@@ -105,5 +108,10 @@ export class EditClosureComponent implements OnInit {
           { relativeTo: this.route }
         );
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -18,6 +18,7 @@ import { OrganizationService } from 'app/organization/organization.service';
 import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Adhoc Query Component.
@@ -31,7 +32,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FaIconComponent
   ]
 })
-export class ViewAdhocQueryComponent {
+export class ViewAdhocQueryComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private organizationService = inject(OrganizationService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -48,7 +50,7 @@ export class ViewAdhocQueryComponent {
    * @param {MatDialog} dialog Dialog reference.
    */
   constructor() {
-    this.route.data.subscribe((data: { adhocQuery: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { adhocQuery: any }) => {
       this.adhocQueryData = data.adhocQuery;
     });
   }
@@ -72,12 +74,23 @@ export class ViewAdhocQueryComponent {
     const deleteAdhocQueryDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `adhoc query ${this.adhocQueryData.id}` }
     });
-    deleteAdhocQueryDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.organizationService.deleteAdhocQuery(this.adhocQueryData.id).subscribe(() => {
-          this.router.navigate(['/organization/adhoc-query']);
-        });
-      }
-    });
+    deleteAdhocQueryDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.organizationService
+            .deleteAdhocQuery(this.adhocQueryData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['/organization/adhoc-query']);
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

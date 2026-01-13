@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -17,6 +17,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { TranslateService } from '@ngx-translate/core';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit tax component.
@@ -29,7 +30,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class EditTaxComponentComponent implements OnInit {
+export class EditTaxComponentComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private productsService = inject(ProductsService);
   private route = inject(ActivatedRoute);
@@ -57,7 +59,7 @@ export class EditTaxComponentComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service.
    */
   constructor() {
-    this.route.data.subscribe((data: { taxComponent: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { taxComponent: any }) => {
       this.taxComponentData = data.taxComponent;
     });
   }
@@ -122,14 +124,22 @@ export class EditTaxComponentComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.productsService.updateTaxComponent(this.taxComponentData.id, data).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.productsService
+      .updateTaxComponent(this.taxComponentData.id, data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 /** Custom Components */
@@ -40,6 +40,7 @@ import { LoanProductPaymentStrategyStepComponent } from '../loan-product-stepper
 import { StepperButtonsComponent } from '../../../shared/steppers/stepper-buttons/stepper-buttons.component';
 import { LoanProductPreviewStepComponent } from '../loan-product-stepper/loan-product-preview-step/loan-product-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-create-loan-product',
@@ -65,7 +66,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     LoanProductPreviewStepComponent
   ]
 })
-export class CreateLoanProductComponent implements OnInit {
+export class CreateLoanProductComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private productsService = inject(ProductsService);
   private loanProducts = inject(LoanProducts);
@@ -110,17 +112,19 @@ export class CreateLoanProductComponent implements OnInit {
   constructor() {
     const loanProducts = this.loanProducts;
 
-    this.route.data.subscribe((data: { loanProductsTemplate: any; configurations: any }) => {
-      this.loanProductsTemplate = data.loanProductsTemplate;
-      const assetAccountData = this.loanProductsTemplate.accountingMappingOptions.assetAccountOptions || [];
-      const liabilityAccountData = this.loanProductsTemplate.accountingMappingOptions.liabilityAccountOptions || [];
-      this.loanProductsTemplate.accountingMappingOptions.assetAndLiabilityAccountOptions =
-        assetAccountData.concat(liabilityAccountData);
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { loanProductsTemplate: any; configurations: any }) => {
+        this.loanProductsTemplate = data.loanProductsTemplate;
+        const assetAccountData = this.loanProductsTemplate.accountingMappingOptions.assetAccountOptions || [];
+        const liabilityAccountData = this.loanProductsTemplate.accountingMappingOptions.liabilityAccountOptions || [];
+        this.loanProductsTemplate.accountingMappingOptions.assetAndLiabilityAccountOptions =
+          assetAccountData.concat(liabilityAccountData);
 
-      this.itemsByDefault = loanProducts.setItemsByDefault(data.configurations);
-      this.loanProductsTemplate['itemsByDefault'] = this.itemsByDefault;
-      this.loanProductsTemplate = loanProducts.updateLoanProductDefaults(this.loanProductsTemplate, false);
-    });
+        this.itemsByDefault = loanProducts.setItemsByDefault(data.configurations);
+        this.loanProductsTemplate['itemsByDefault'] = this.itemsByDefault;
+        this.loanProductsTemplate = loanProducts.updateLoanProductDefaults(this.loanProductsTemplate, false);
+      });
   }
 
   ngOnInit() {
@@ -315,15 +319,18 @@ export class CreateLoanProductComponent implements OnInit {
     }
     delete loanProduct['useDueForRepaymentsConfigurations'];
 
-    this.productsService.createLoanProduct(loanProduct).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.productsService
+      .createLoanProduct(loanProduct)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
   }
 
   mapStringEnumOptionToIdList(incomingValues: StringEnumOptionData[]): string[] {
@@ -331,5 +338,10 @@ export class CreateLoanProductComponent implements OnInit {
       return [];
     }
     return incomingValues.map((v) => v.id);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -20,6 +20,7 @@ import { Location } from '@angular/common';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { GlAccountDisplayComponent } from '../../../shared/accounting/gl-account-display/gl-account-display.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View financial activity mapping component.
@@ -34,7 +35,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     GlAccountDisplayComponent
   ]
 })
-export class ViewFinancialActivityMappingComponent {
+export class ViewFinancialActivityMappingComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -54,7 +56,7 @@ export class ViewFinancialActivityMappingComponent {
    * @param {MatDialog} dialog Dialog reference.
    */
   constructor() {
-    this.route.data.subscribe((data: { financialActivityAccount: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { financialActivityAccount: any }) => {
       this.financialActivityAccount = data.financialActivityAccount;
       this.financialActivityAccountId = data.financialActivityAccount.id;
     });
@@ -67,16 +69,27 @@ export class ViewFinancialActivityMappingComponent {
     const deleteFinancialActivityAccountDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `financial activity mapping ${this.financialActivityAccountId}` }
     });
-    deleteFinancialActivityAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.accountingService.deleteFinancialActivityAccount(this.financialActivityAccountId).subscribe(() => {
-          this.router.navigate(['/accounting/financial-activity-mappings']);
-        });
-      }
-    });
+    deleteFinancialActivityAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.accountingService
+            .deleteFinancialActivityAccount(this.financialActivityAccountId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['/accounting/financial-activity-mappings']);
+            });
+        }
+      });
   }
 
   goBack(): void {
     this.location.back();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -25,6 +25,7 @@ import {
 } from '@angular/material/table';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Reports component.
@@ -50,7 +51,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class ReportsComponent implements OnInit {
+export class ReportsComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -80,7 +82,7 @@ export class ReportsComponent implements OnInit {
    */
   constructor() {
     this.router.routeReuseStrategy.shouldReuseRoute = () => false;
-    this.route.data.subscribe((data: { reports: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { reports: any }) => {
       this.reportsData = data.reports;
     });
     this.filter = this.route.snapshot.params['filter'];
@@ -149,5 +151,10 @@ export class ReportsComponent implements OnInit {
         return dataStr.indexOf(transformedFilter) !== -1;
       }
     };
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

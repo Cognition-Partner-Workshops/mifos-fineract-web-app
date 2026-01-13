@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, Input, Output, EventEmitter, inject } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormBuilder,
   UntypedFormGroup,
@@ -26,6 +26,7 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Client Component
@@ -44,7 +45,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatStepperNext
   ]
 })
-export class ClientGeneralStepComponent implements OnInit {
+export class ClientGeneralStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private dateUtils = inject(Dates);
   private settingsService = inject(SettingsService);
@@ -151,72 +153,87 @@ export class ClientGeneralStepComponent implements OnInit {
    * Adds controls conditionally.
    */
   buildDependencies() {
-    this.createClientForm.get('legalFormId').valueChanges.subscribe((legalFormId: number) => {
-      this.legalFormChangeEvent.emit({ legalForm: legalFormId });
-      if (legalFormId === 1) {
-        this.createClientForm.removeControl('fullname');
-        this.createClientForm.removeControl('clientNonPersonDetails');
-        this.createClientForm.addControl(
-          'firstname',
-          new UntypedFormControl('', [
-            Validators.required,
-            Validators.pattern('(^[A-z]).*')
-          ])
-        );
-        this.createClientForm.addControl('middlename', new UntypedFormControl('', Validators.pattern('(^[A-z]).*')));
-        this.createClientForm.addControl(
-          'lastname',
-          new UntypedFormControl('', [
-            Validators.required,
-            Validators.pattern('(^[A-z]).*')
-          ])
-        );
-      } else {
-        this.createClientForm.removeControl('firstname');
-        this.createClientForm.removeControl('middlename');
-        this.createClientForm.removeControl('lastname');
-        this.createClientForm.addControl(
-          'fullname',
-          new UntypedFormControl('', [
-            Validators.required,
-            Validators.pattern('(^[A-z]).*')
-          ])
-        );
-        this.createClientForm.addControl(
-          'clientNonPersonDetails',
-          this.formBuilder.group({
-            constitutionId: [
-              '',
-              Validators.required
-            ],
-            incorpValidityTillDate: [''],
-            incorpNumber: [''],
-            mainBusinessLineId: [''],
-            remarks: ['']
-          })
-        );
-      }
-    });
-    this.createClientForm.get('legalFormId').patchValue(1);
-    this.createClientForm.get('active').valueChanges.subscribe((active: boolean) => {
-      if (active) {
-        this.createClientForm.addControl('activationDate', new UntypedFormControl('', Validators.required));
-      } else {
-        this.createClientForm.removeControl('activationDate');
-      }
-    });
-    this.createClientForm.get('addSavings').valueChanges.subscribe((active: boolean) => {
-      if (active) {
-        this.createClientForm.addControl('savingsProductId', new UntypedFormControl('', Validators.required));
-      } else {
-        this.createClientForm.removeControl('savingsProductId');
-      }
-    });
-    this.createClientForm.get('officeId').valueChanges.subscribe((officeId: number) => {
-      this.clientService.getClientWithOfficeTemplate(officeId).subscribe((clientTemplate: any) => {
-        this.staffOptions = clientTemplate.staffOptions;
+    this.createClientForm
+      .get('legalFormId')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((legalFormId: number) => {
+        this.legalFormChangeEvent.emit({ legalForm: legalFormId });
+        if (legalFormId === 1) {
+          this.createClientForm.removeControl('fullname');
+          this.createClientForm.removeControl('clientNonPersonDetails');
+          this.createClientForm.addControl(
+            'firstname',
+            new UntypedFormControl('', [
+              Validators.required,
+              Validators.pattern('(^[A-z]).*')
+            ])
+          );
+          this.createClientForm.addControl('middlename', new UntypedFormControl('', Validators.pattern('(^[A-z]).*')));
+          this.createClientForm.addControl(
+            'lastname',
+            new UntypedFormControl('', [
+              Validators.required,
+              Validators.pattern('(^[A-z]).*')
+            ])
+          );
+        } else {
+          this.createClientForm.removeControl('firstname');
+          this.createClientForm.removeControl('middlename');
+          this.createClientForm.removeControl('lastname');
+          this.createClientForm.addControl(
+            'fullname',
+            new UntypedFormControl('', [
+              Validators.required,
+              Validators.pattern('(^[A-z]).*')
+            ])
+          );
+          this.createClientForm.addControl(
+            'clientNonPersonDetails',
+            this.formBuilder.group({
+              constitutionId: [
+                '',
+                Validators.required
+              ],
+              incorpValidityTillDate: [''],
+              incorpNumber: [''],
+              mainBusinessLineId: [''],
+              remarks: ['']
+            })
+          );
+        }
       });
-    });
+    this.createClientForm.get('legalFormId').patchValue(1);
+    this.createClientForm
+      .get('active')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((active: boolean) => {
+        if (active) {
+          this.createClientForm.addControl('activationDate', new UntypedFormControl('', Validators.required));
+        } else {
+          this.createClientForm.removeControl('activationDate');
+        }
+      });
+    this.createClientForm
+      .get('addSavings')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((active: boolean) => {
+        if (active) {
+          this.createClientForm.addControl('savingsProductId', new UntypedFormControl('', Validators.required));
+        } else {
+          this.createClientForm.removeControl('savingsProductId');
+        }
+      });
+    this.createClientForm
+      .get('officeId')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((officeId: number) => {
+        this.clientService
+          .getClientWithOfficeTemplate(officeId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((clientTemplate: any) => {
+            this.staffOptions = clientTemplate.staffOptions;
+          });
+      });
   }
 
   getDateLabel(legalFormId: number, values: string[]): string {
@@ -257,5 +274,10 @@ export class ClientGeneralStepComponent implements OnInit {
       };
     }
     return generalDetails;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -20,6 +20,7 @@ import { ValidateOnFocusDirective } from '../../../directives/validate-on-focus.
 import { GlAccountSelectorComponent } from '../../../shared/accounting/gl-account-selector/gl-account-selector.component';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Charge component.
@@ -35,7 +36,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatCheckbox
   ]
 })
-export class EditChargeComponent implements OnInit {
+export class EditChargeComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private productsService = inject(ProductsService);
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
@@ -78,7 +80,7 @@ export class EditChargeComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { chargesTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { chargesTemplate: any }) => {
       this.chargeData = data.chargesTemplate;
     });
   }
@@ -213,8 +215,16 @@ export class EditChargeComponent implements OnInit {
     if (!charges.maxCap) {
       delete charges.maxCap;
     }
-    this.productsService.updateCharge(this.chargeData.id.toString(), charges).subscribe((response: any) => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.productsService
+      .updateCharge(this.chargeData.id.toString(), charges)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -20,6 +20,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { TitleCasePipe } from '@angular/common';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Teller Component.
@@ -35,7 +36,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ViewTellerComponent {
+export class ViewTellerComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private organizationService = inject(OrganizationService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -52,7 +54,7 @@ export class ViewTellerComponent {
    * @param {MatDialog} dialog Dialog reference.
    */
   constructor() {
-    this.route.data.subscribe((data: { teller: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { teller: any }) => {
       this.tellerData = data.teller;
     });
   }
@@ -64,12 +66,23 @@ export class ViewTellerComponent {
     const deleteTellerDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `teller ${this.tellerData.id}` }
     });
-    deleteTellerDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.organizationService.deleteTeller(this.tellerData.id).subscribe(() => {
-          this.router.navigate(['/organization/tellers']);
-        });
-      }
-    });
+    deleteTellerDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.organizationService
+            .deleteTeller(this.tellerData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['/organization/tellers']);
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

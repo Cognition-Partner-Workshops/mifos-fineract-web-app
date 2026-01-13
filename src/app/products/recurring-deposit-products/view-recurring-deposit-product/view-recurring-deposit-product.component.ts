@@ -6,10 +6,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLinkActive, RouterLink, RouterOutlet } from '@angular/router';
 import { MatTabNav, MatTabLink, MatTabNavPanel } from '@angular/material/tabs';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-view-recurring-deposit-product',
@@ -24,13 +25,14 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     RouterOutlet
   ]
 })
-export class ViewRecurringDepositProductComponent {
+export class ViewRecurringDepositProductComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   recurringDepositDatatables: any = [];
 
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositDatatables: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositDatatables: any }) => {
       this.recurringDepositDatatables = [];
       data.recurringDepositDatatables.forEach((datatable: any) => {
         if (datatable.entitySubType === 'Recurring Deposit') {
@@ -38,5 +40,10 @@ export class ViewRecurringDepositProductComponent {
         }
       });
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

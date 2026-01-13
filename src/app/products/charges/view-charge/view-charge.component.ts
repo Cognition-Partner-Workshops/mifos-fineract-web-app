@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -21,6 +21,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { GlAccountDisplayComponent } from '../../../shared/accounting/gl-account-display/gl-account-display.component';
 import { YesnoPipe } from '../../../pipes/yesno.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Charge Component.
@@ -36,7 +37,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     YesnoPipe
   ]
 })
-export class ViewChargeComponent {
+export class ViewChargeComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private productsService = inject(ProductsService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -57,7 +59,7 @@ export class ViewChargeComponent {
    * @param {TranslateService} translateService Translate Service.
    */
   constructor() {
-    this.route.data.subscribe((data: { charge: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { charge: any }) => {
       this.chargeData = data.charge;
       if (this.chargeData.minCap) {
         this.minCap = true;
@@ -75,12 +77,23 @@ export class ViewChargeComponent {
     const deleteChargeDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: this.translateService.instant('labels.inputs.Charge') + ' ' + this.chargeData.id }
     });
-    deleteChargeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.productsService.deleteCharge(this.chargeData.id).subscribe(() => {
-          this.router.navigate(['/products/charges']);
-        });
-      }
-    });
+    deleteChargeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.productsService
+            .deleteCharge(this.chargeData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['/products/charges']);
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

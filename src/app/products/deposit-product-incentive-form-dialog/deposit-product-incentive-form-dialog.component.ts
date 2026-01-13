@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   MatDialogRef,
   MAT_DIALOG_DATA,
@@ -19,6 +19,7 @@ import { UntypedFormBuilder, UntypedFormGroup, Validators, ReactiveFormsModule }
 import { TranslateService } from '@ngx-translate/core';
 import { CdkScrollable } from '@angular/cdk/scrolling';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-deposit-product-incentive-form-dialog',
@@ -33,7 +34,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatDialogClose
   ]
 })
-export class DepositProductIncentiveFormDialogComponent implements OnInit {
+export class DepositProductIncentiveFormDialogComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   dialogRef = inject<MatDialogRef<DepositProductIncentiveFormDialogComponent>>(MatDialogRef);
   data = inject(MAT_DIALOG_DATA);
   private formBuilder = inject(UntypedFormBuilder);
@@ -90,13 +92,16 @@ export class DepositProductIncentiveFormDialogComponent implements OnInit {
   }
 
   setConditionalControls() {
-    this.depositProductIncentiveForm.get('attributeName').valueChanges.subscribe((attributeName: any) => {
-      this.depositProductIncentiveForm.patchValue({ attributeValue: '' });
-      this.attributeValueData =
-        this.data.chartTemplate[
-          `${this.attributeNameData.find((option: any) => option.id === attributeName).code.split('.')[1]}Options`
-        ];
-    });
+    this.depositProductIncentiveForm
+      .get('attributeName')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((attributeName: any) => {
+        this.depositProductIncentiveForm.patchValue({ attributeValue: '' });
+        this.attributeValueData =
+          this.data.chartTemplate[
+            `${this.attributeNameData.find((option: any) => option.id === attributeName).code.split('.')[1]}Options`
+          ];
+      });
   }
 
   createDepositProductIncentiveForm() {
@@ -123,5 +128,10 @@ export class DepositProductIncentiveFormDialogComponent implements OnInit {
         Validators.required
       ]
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -20,6 +20,7 @@ import { MatRadioGroup, MatRadioButton } from '@angular/material/radio';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit accounting rule component.
@@ -36,7 +37,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class EditRuleComponent implements OnInit {
+export class EditRuleComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
@@ -63,13 +65,15 @@ export class EditRuleComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { accountingRulesTemplate: any; accountingRule: any }) => {
-      this.officeData = data.accountingRulesTemplate.allowedOffices;
-      this.glAccountData = data.accountingRulesTemplate.allowedAccounts;
-      this.debitTagData = data.accountingRulesTemplate.allowedDebitTagOptions;
-      this.creditTagData = data.accountingRulesTemplate.allowedCreditTagOptions;
-      this.accountingRule = data.accountingRule;
-    });
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { accountingRulesTemplate: any; accountingRule: any }) => {
+        this.officeData = data.accountingRulesTemplate.allowedOffices;
+        this.glAccountData = data.accountingRulesTemplate.allowedAccounts;
+        this.debitTagData = data.accountingRulesTemplate.allowedDebitTagOptions;
+        this.creditTagData = data.accountingRulesTemplate.allowedCreditTagOptions;
+        this.accountingRule = data.accountingRule;
+      });
   }
 
   /**
@@ -112,24 +116,30 @@ export class EditRuleComponent implements OnInit {
    * Sets accounting rule form for selected accounting rule type.
    */
   setAccountingRulesForm() {
-    this.accountingRuleForm.get('debitRuleType').valueChanges.subscribe((debitRuleType) => {
-      if (debitRuleType === 'fixedAccount') {
-        this.accountingRuleForm.get('debitTags').reset();
-        this.accountingRuleForm.get('allowMultipleDebitEntries').reset();
-      } else {
-        this.accountingRuleForm.get('accountToDebit').reset();
-        this.accountingRuleForm.get('allowMultipleDebitEntries').setValue(false);
-      }
-    });
-    this.accountingRuleForm.get('creditRuleType').valueChanges.subscribe((creditRuleType) => {
-      if (creditRuleType === 'fixedAccount') {
-        this.accountingRuleForm.get('creditTags').reset();
-        this.accountingRuleForm.get('allowMultipleCreditEntries').reset();
-      } else {
-        this.accountingRuleForm.get('accountToCredit').reset();
-        this.accountingRuleForm.get('allowMultipleCreditEntries').setValue(false);
-      }
-    });
+    this.accountingRuleForm
+      .get('debitRuleType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((debitRuleType) => {
+        if (debitRuleType === 'fixedAccount') {
+          this.accountingRuleForm.get('debitTags').reset();
+          this.accountingRuleForm.get('allowMultipleDebitEntries').reset();
+        } else {
+          this.accountingRuleForm.get('accountToDebit').reset();
+          this.accountingRuleForm.get('allowMultipleDebitEntries').setValue(false);
+        }
+      });
+    this.accountingRuleForm
+      .get('creditRuleType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((creditRuleType) => {
+        if (creditRuleType === 'fixedAccount') {
+          this.accountingRuleForm.get('creditTags').reset();
+          this.accountingRuleForm.get('allowMultipleCreditEntries').reset();
+        } else {
+          this.accountingRuleForm.get('accountToCredit').reset();
+          this.accountingRuleForm.get('allowMultipleCreditEntries').setValue(false);
+        }
+      });
 
     if (this.accountingRule.debitAccounts) {
       this.accountingRuleForm.get('debitRuleType').setValue('fixedAccount');
@@ -176,14 +186,22 @@ export class EditRuleComponent implements OnInit {
     }
     delete accountingRule.debitRuleType;
     delete accountingRule.creditRuleType;
-    this.accountingService.updateAccountingRule(this.accountingRule.id, accountingRule).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.accountingService
+      .updateAccountingRule(this.accountingRule.id, accountingRule)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

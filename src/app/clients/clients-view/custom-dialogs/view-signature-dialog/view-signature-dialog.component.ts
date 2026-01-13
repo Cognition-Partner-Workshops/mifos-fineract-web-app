@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   MatDialogRef,
   MAT_DIALOG_DATA,
@@ -25,6 +25,7 @@ import { ClientsService } from 'app/clients/clients.service';
 import { Buffer } from 'buffer';
 import { CdkScrollable } from '@angular/cdk/scrolling';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View signature dialog component.
@@ -42,7 +43,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatDialogClose
   ]
 })
-export class ViewSignatureDialogComponent implements OnInit {
+export class ViewSignatureDialogComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   dialogRef = inject<MatDialogRef<ViewSignatureDialogComponent>>(MatDialogRef);
   private clientsService = inject(ClientsService);
   private sanitizer = inject(DomSanitizer);
@@ -70,13 +72,21 @@ export class ViewSignatureDialogComponent implements OnInit {
 
   ngOnInit() {
     if (this.signatureId) {
-      this.clientsService.getClientSignatureImage(this.clientId, this.signatureId).subscribe(
-        async (blob: any) => {
-          const buffer = Buffer.from(await blob.arrayBuffer());
-          this.signatureImage = 'data:' + blob.type + ';base64,' + buffer.toString('base64');
-        },
-        (error: any) => {}
-      );
+      this.clientsService
+        .getClientSignatureImage(this.clientId, this.signatureId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(
+          async (blob: any) => {
+            const buffer = Buffer.from(await blob.arrayBuffer());
+            this.signatureImage = 'data:' + blob.type + ';base64,' + buffer.toString('base64');
+          },
+          (error: any) => {}
+        );
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

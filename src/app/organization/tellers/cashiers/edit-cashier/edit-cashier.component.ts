@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports. */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Dates } from 'app/core/utils/dates';
@@ -17,6 +17,7 @@ import { OrganizationService } from 'app/organization/organization.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Cashier component.
@@ -30,7 +31,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatCheckbox
   ]
 })
-export class EditCashierComponent implements OnInit {
+export class EditCashierComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -59,7 +61,7 @@ export class EditCashierComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service.
    */
   constructor() {
-    this.route.data.subscribe((data: { cashier: any; cashierTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { cashier: any; cashierTemplate: any }) => {
       this.cashierData.data = data.cashier;
       this.cashierData.template = data.cashierTemplate;
       this.isStaffId = this.cashierData.template.staffOptions.some(
@@ -118,8 +120,14 @@ export class EditCashierComponent implements OnInit {
     };
     this.organizationService
       .updateCashier(this.cashierData.data.tellerId, this.cashierData.data.id, data)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: any) => {
         this.router.navigate(['../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

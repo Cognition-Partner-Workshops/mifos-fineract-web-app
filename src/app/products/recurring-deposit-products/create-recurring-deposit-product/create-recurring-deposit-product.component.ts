@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, ViewChild, inject } from '@angular/core';
+import { Component, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 /** Custom Components */
@@ -27,6 +27,7 @@ import { MatStepper, MatStepperIcon, MatStep, MatStepLabel } from '@angular/mate
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { RecurringDepositProductPreviewStepComponent } from '../recurring-deposit-product-stepper/recurring-deposit-product-preview-step/recurring-deposit-product-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-create-recurring-deposit-product',
@@ -49,7 +50,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     RecurringDepositProductPreviewStepComponent
   ]
 })
-export class CreateRecurringDepositProductComponent {
+export class CreateRecurringDepositProductComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private productsService = inject(ProductsService);
   private router = inject(Router);
@@ -82,7 +84,7 @@ export class CreateRecurringDepositProductComponent {
    */
 
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositProductsTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositProductsTemplate: any }) => {
       this.recurringDepositProductsTemplate = data.recurringDepositProductsTemplate;
     });
     this.accountingRuleData = this.accounting.getAccountingRulesForSavings();
@@ -146,14 +148,22 @@ export class CreateRecurringDepositProductComponent {
       recurringDepositProduct.description = '';
     }
     delete recurringDepositProduct.advancedAccountingRules;
-    this.productsService.createRecurringDepositProduct(recurringDepositProduct).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.productsService
+      .createRecurringDepositProduct(recurringDepositProduct)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

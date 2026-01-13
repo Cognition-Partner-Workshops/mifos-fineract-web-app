@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -23,6 +23,7 @@ import { ConfigurationWizardService } from '../../../configuration-wizard/config
 import { ContinueSetupDialogComponent } from '../../../configuration-wizard/continue-setup-dialog/continue-setup-dialog.component';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create employee component.
@@ -36,7 +37,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatCheckbox
   ]
 })
-export class CreateEmployeeComponent implements OnInit, AfterViewInit {
+export class CreateEmployeeComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
   private settingsService = inject(SettingsService);
@@ -74,7 +76,7 @@ export class CreateEmployeeComponent implements OnInit, AfterViewInit {
    * @param {MatDialog} dialog MatDialog.
    */
   constructor() {
-    this.route.data.subscribe((data: { offices: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { offices: any }) => {
       this.officeData = data.offices;
     });
   }
@@ -141,14 +143,17 @@ export class CreateEmployeeComponent implements OnInit, AfterViewInit {
       dateFormat,
       locale
     };
-    this.organizationService.createEmployee(data).subscribe((response: any) => {
-      if (this.configurationWizardService.showEmployeeForm === true) {
-        this.configurationWizardService.showEmployeeForm = false;
-        this.openDialog();
-      } else {
-        this.router.navigate(['../'], { relativeTo: this.route });
-      }
-    });
+    this.organizationService
+      .createEmployee(data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (this.configurationWizardService.showEmployeeForm === true) {
+          this.configurationWizardService.showEmployeeForm = false;
+          this.openDialog();
+        } else {
+          this.router.navigate(['../'], { relativeTo: this.route });
+        }
+      });
   }
 
   /**
@@ -205,20 +210,28 @@ export class CreateEmployeeComponent implements OnInit, AfterViewInit {
         stepName: 'employee'
       }
     });
-    continueSetupDialogRef.afterClosed().subscribe((response: { step: number }) => {
-      if (response.step === 1) {
-        this.configurationWizardService.showEmployeeForm = false;
-        this.router.navigate(['../'], { relativeTo: this.route });
-      } else if (response.step === 2) {
-        this.configurationWizardService.showEmployeeForm = true;
-        this.router.routeReuseStrategy.shouldReuseRoute = () => false;
-        this.router.onSameUrlNavigation = 'reload';
-        this.router.navigate(['/organization/employees/create']);
-      } else if (response.step === 3) {
-        this.configurationWizardService.showEmployeeForm = false;
-        this.configurationWizardService.showDefineWorkingDays = true;
-        this.router.navigate(['/organization']);
-      }
-    });
+    continueSetupDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: { step: number }) => {
+        if (response.step === 1) {
+          this.configurationWizardService.showEmployeeForm = false;
+          this.router.navigate(['../'], { relativeTo: this.route });
+        } else if (response.step === 2) {
+          this.configurationWizardService.showEmployeeForm = true;
+          this.router.routeReuseStrategy.shouldReuseRoute = () => false;
+          this.router.onSameUrlNavigation = 'reload';
+          this.router.navigate(['/organization/employees/create']);
+        } else if (response.step === 3) {
+          this.configurationWizardService.showEmployeeForm = false;
+          this.configurationWizardService.showDefineWorkingDays = true;
+          this.router.navigate(['/organization']);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

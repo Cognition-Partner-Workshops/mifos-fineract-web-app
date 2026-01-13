@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, Input, inject } from '@angular/core';
+import { Component, OnInit, Input, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, UntypedFormArray } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -40,6 +40,7 @@ import {
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-share-product-market-price-step',
@@ -65,7 +66,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ShareProductMarketPriceStepComponent implements OnInit {
+export class ShareProductMarketPriceStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   dialog = inject(MatDialog);
   private dateUtils = inject(Dates);
@@ -121,35 +123,44 @@ export class ShareProductMarketPriceStepComponent implements OnInit {
   addMarketPricePeriod() {
     const data = this.getData();
     const addMarketPricePeriodDialogRef = this.dialog.open(FormDialogComponent, { data });
-    addMarketPricePeriodDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        this.marketPricePeriods.push(response.data);
-        this.setShareProductMarketPriceFormDirty();
-      }
-    });
+    addMarketPricePeriodDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          this.marketPricePeriods.push(response.data);
+          this.setShareProductMarketPriceFormDirty();
+        }
+      });
   }
 
   editMarketPricePeriod(index: number) {
     const data = { ...this.getData(this.marketPricePeriods.at(index).value), layout: { addButtonText: 'Edit' } };
     const addMarketPricePeriodDialogRef = this.dialog.open(FormDialogComponent, { data });
-    addMarketPricePeriodDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        this.marketPricePeriods.at(index).patchValue(response.data.value);
-        this.setShareProductMarketPriceFormDirty();
-      }
-    });
+    addMarketPricePeriodDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          this.marketPricePeriods.at(index).patchValue(response.data.value);
+          this.setShareProductMarketPriceFormDirty();
+        }
+      });
   }
 
   deleteMarketPricePeriod(index: number) {
     const deleteMarketPricePeriodDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `this` }
     });
-    deleteMarketPricePeriodDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.marketPricePeriods.removeAt(index);
-        this.setShareProductMarketPriceFormDirty();
-      }
-    });
+    deleteMarketPricePeriodDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.marketPricePeriods.removeAt(index);
+          this.setShareProductMarketPriceFormDirty();
+        }
+      });
   }
 
   getData(values?: any) {
@@ -195,5 +206,10 @@ export class ShareProductMarketPriceStepComponent implements OnInit {
       });
     }
     return { marketPricePeriods };
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports. */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -21,6 +21,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Holidays component.
@@ -35,7 +36,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ViewHolidaysComponent {
+export class ViewHolidaysComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private dialog = inject(MatDialog);
@@ -50,7 +52,7 @@ export class ViewHolidaysComponent {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { holidays: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { holidays: any }) => {
       this.holidayData = data.holidays;
     });
   }
@@ -62,13 +64,19 @@ export class ViewHolidaysComponent {
     const deleteHolidayDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `holiday ${this.holidayData.id}` }
     });
-    deleteHolidayDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.organizationService.deleteHoliday(this.holidayData.id).subscribe(() => {
-          this.router.navigate(['../'], { relativeTo: this.route });
-        });
-      }
-    });
+    deleteHolidayDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.organizationService
+            .deleteHoliday(this.holidayData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['../'], { relativeTo: this.route });
+            });
+        }
+      });
   }
 
   /**
@@ -84,12 +92,23 @@ export class ViewHolidaysComponent {
           this.translateService.instant('labels.dialogContext.holiday')
       }
     });
-    unAssignStaffDialogRef.afterClosed().subscribe((response: { confirm: any }) => {
-      if (response.confirm) {
-        this.organizationService.activateHoliday(this.holidayData.id).subscribe(() => {
-          this.router.navigate(['/organization/holidays']);
-        });
-      }
-    });
+    unAssignStaffDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: { confirm: any }) => {
+        if (response.confirm) {
+          this.organizationService
+            .activateHoliday(this.holidayData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['/organization/holidays']);
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

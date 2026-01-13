@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, Input, Output, EventEmitter, inject } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -26,6 +26,7 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-loan-product-settings-step',
@@ -42,7 +43,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatStepperNext
   ]
 })
-export class LoanProductSettingsStepComponent implements OnInit {
+export class LoanProductSettingsStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private processingStrategyService = inject(ProcessingStrategyService);
 
@@ -92,12 +94,14 @@ export class LoanProductSettingsStepComponent implements OnInit {
 
   ngOnInit() {
     this.defaultConfigValues = this.loanProductsTemplate['itemsByDefault'];
-    this.isLinkedToFloatingInterestRates.valueChanges.subscribe((isLinkedToFloatingInterestRates: any) => {
-      if (isLinkedToFloatingInterestRates) {
-        this.loanProductSettingsForm.get('isInterestRecalculationEnabled').setValue(true);
-        this.loanProductSettingsForm.get('allowPartialPeriodInterestCalculation').setValue(true);
-      }
-    });
+    this.isLinkedToFloatingInterestRates.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((isLinkedToFloatingInterestRates: any) => {
+        if (isLinkedToFloatingInterestRates) {
+          this.loanProductSettingsForm.get('isInterestRecalculationEnabled').setValue(true);
+          this.loanProductSettingsForm.get('allowPartialPeriodInterestCalculation').setValue(true);
+        }
+      });
 
     this.amortizationTypeData = this.loanProductsTemplate.amortizationTypeOptions;
     this.interestTypeData = this.loanProductsTemplate.interestTypeOptions;
@@ -380,26 +384,30 @@ export class LoanProductSettingsStepComponent implements OnInit {
   setConditionalControls() {
     const allowAttributeOverrides = this.loanProductSettingsForm.get('allowAttributeOverrides');
 
-    this.loanProductSettingsForm.get('daysInYearType').valueChanges.subscribe((daysInYearType: any) => {
-      if (this.isAdvancedTransactionProcessingStrategy) {
-        this.useDaysInYearCustomStrategy = daysInYearType == 1;
-        if (this.useDaysInYearCustomStrategy) {
-          const daysInYearCustomStrategy: string = this.loanProductsTemplate.daysInYearCustomStrategy?.id
-            ? this.loanProductsTemplate.daysInYearCustomStrategy.id
-            : this.daysInYearCustomStrategyOptions[0].id;
-          this.loanProductSettingsForm.addControl(
-            'daysInYearCustomStrategy',
-            new UntypedFormControl(daysInYearCustomStrategy, Validators.required)
-          );
-        } else {
-          this.loanProductSettingsForm.removeControl('daysInYearCustomStrategy');
+    this.loanProductSettingsForm
+      .get('daysInYearType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((daysInYearType: any) => {
+        if (this.isAdvancedTransactionProcessingStrategy) {
+          this.useDaysInYearCustomStrategy = daysInYearType == 1;
+          if (this.useDaysInYearCustomStrategy) {
+            const daysInYearCustomStrategy: string = this.loanProductsTemplate.daysInYearCustomStrategy?.id
+              ? this.loanProductsTemplate.daysInYearCustomStrategy.id
+              : this.daysInYearCustomStrategyOptions[0].id;
+            this.loanProductSettingsForm.addControl(
+              'daysInYearCustomStrategy',
+              new UntypedFormControl(daysInYearCustomStrategy, Validators.required)
+            );
+          } else {
+            this.loanProductSettingsForm.removeControl('daysInYearCustomStrategy');
+          }
         }
-      }
-    });
+      });
 
     this.loanProductSettingsForm
       .get('interestCalculationPeriodType')
-      .valueChanges.subscribe((interestCalculationPeriodType: any) => {
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((interestCalculationPeriodType: any) => {
         if (interestCalculationPeriodType === 0) {
           this.loanProductSettingsForm.patchValue({ allowPartialPeriodInterestCalculation: false });
         }
@@ -407,7 +415,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
 
     this.loanProductSettingsForm
       .get('allowVariableInstallments')
-      .valueChanges.subscribe((allowVariableInstallments: any) => {
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((allowVariableInstallments: any) => {
         if (allowVariableInstallments) {
           this.loanProductSettingsForm.addControl('minimumGap', new UntypedFormControl('', Validators.required));
           this.loanProductSettingsForm.addControl('maximumGap', new UntypedFormControl('', Validators.required));
@@ -418,7 +427,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
       });
     this.loanProductSettingsForm
       .get('isInterestRecalculationEnabled')
-      .valueChanges.subscribe((isInterestRecalculationEnabled: any) => {
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((isInterestRecalculationEnabled: any) => {
         if (isInterestRecalculationEnabled) {
           this.loanProductSettingsForm.addControl(
             'preClosureInterestCalculationStrategy',
@@ -442,7 +452,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
           }
           this.loanProductSettingsForm
             .get('interestRecalculationCompoundingMethod')
-            .valueChanges.subscribe((interestRecalculationCompoundingMethod: any) => {
+            .valueChanges.pipe(takeUntil(this.destroy$))
+            .subscribe((interestRecalculationCompoundingMethod: any) => {
               if (interestRecalculationCompoundingMethod !== 0) {
                 this.loanProductSettingsForm.addControl(
                   'recalculationCompoundingFrequencyType',
@@ -451,7 +462,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
 
                 this.loanProductSettingsForm
                   .get('recalculationCompoundingFrequencyType')
-                  .valueChanges.subscribe((recalculationCompoundingFrequencyType: any) => {
+                  .valueChanges.pipe(takeUntil(this.destroy$))
+                  .subscribe((recalculationCompoundingFrequencyType: any) => {
                     if (recalculationCompoundingFrequencyType !== 1) {
                       this.loanProductSettingsForm.addControl(
                         'recalculationCompoundingFrequencyInterval',
@@ -480,7 +492,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
 
                       this.loanProductSettingsForm
                         .get('recalculationCompoundingFrequencyNthDayType')
-                        .valueChanges.subscribe((recalculationCompoundingFrequencyNthDayType: any) => {
+                        .valueChanges.pipe(takeUntil(this.destroy$))
+                        .subscribe((recalculationCompoundingFrequencyNthDayType: any) => {
                           if (recalculationCompoundingFrequencyNthDayType === -2) {
                             this.loanProductSettingsForm.addControl(
                               'recalculationCompoundingFrequencyOnDayType',
@@ -510,7 +523,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
 
           this.loanProductSettingsForm
             .get('recalculationRestFrequencyType')
-            .valueChanges.subscribe((recalculationRestFrequencyType: any) => {
+            .valueChanges.pipe(takeUntil(this.destroy$))
+            .subscribe((recalculationRestFrequencyType: any) => {
               if (recalculationRestFrequencyType !== 1) {
                 this.loanProductSettingsForm.addControl(
                   'recalculationRestFrequencyInterval',
@@ -539,7 +553,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
 
                 this.loanProductSettingsForm
                   .get('recalculationRestFrequencyNthDayType')
-                  .valueChanges.subscribe((recalculationRestFrequencyNthDayType: any) => {
+                  .valueChanges.pipe(takeUntil(this.destroy$))
+                  .subscribe((recalculationRestFrequencyNthDayType: any) => {
                     if (recalculationRestFrequencyNthDayType === -2) {
                       this.loanProductSettingsForm.addControl(
                         'recalculationRestFrequencyOnDayType',
@@ -570,51 +585,67 @@ export class LoanProductSettingsStepComponent implements OnInit {
         this.enableFieldsWhenScheduleTypeIsProgressiveAndInterestRateRecalculationEnabled();
       });
 
-    this.loanProductSettingsForm.get('holdGuaranteeFunds').valueChanges.subscribe((holdGuaranteeFunds) => {
-      if (holdGuaranteeFunds) {
-        this.loanProductSettingsForm.addControl('mandatoryGuarantee', new UntypedFormControl('', Validators.required));
-        this.loanProductSettingsForm.addControl('minimumGuaranteeFromOwnFunds', new UntypedFormControl(''));
-        this.loanProductSettingsForm.addControl('minimumGuaranteeFromGuarantor', new UntypedFormControl(''));
-      } else {
-        this.loanProductSettingsForm.removeControl('mandatoryGuarantee');
-        this.loanProductSettingsForm.removeControl('minimumGuaranteeFromOwnFunds');
-        this.loanProductSettingsForm.removeControl('minimumGuaranteeFromGuarantor');
-      }
-    });
+    this.loanProductSettingsForm
+      .get('holdGuaranteeFunds')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((holdGuaranteeFunds) => {
+        if (holdGuaranteeFunds) {
+          this.loanProductSettingsForm.addControl(
+            'mandatoryGuarantee',
+            new UntypedFormControl('', Validators.required)
+          );
+          this.loanProductSettingsForm.addControl('minimumGuaranteeFromOwnFunds', new UntypedFormControl(''));
+          this.loanProductSettingsForm.addControl('minimumGuaranteeFromGuarantor', new UntypedFormControl(''));
+        } else {
+          this.loanProductSettingsForm.removeControl('mandatoryGuarantee');
+          this.loanProductSettingsForm.removeControl('minimumGuaranteeFromOwnFunds');
+          this.loanProductSettingsForm.removeControl('minimumGuaranteeFromGuarantor');
+        }
+      });
 
-    this.loanProductSettingsForm.get('multiDisburseLoan').valueChanges.subscribe((multiDisburseLoan) => {
-      if (multiDisburseLoan) {
-        this.loanProductSettingsForm.addControl('maxTrancheCount', new UntypedFormControl('', Validators.required));
-        this.loanProductSettingsForm.addControl('outstandingLoanBalance', new UntypedFormControl(''));
-      } else {
-        this.loanProductSettingsForm.removeControl('maxTrancheCount');
-        this.loanProductSettingsForm.removeControl('outstandingLoanBalance');
-        this.loanProductSettingsForm.patchValue({
-          disallowExpectedDisbursements: false,
-          allowFullTermForTranche: false
-        });
-      }
-    });
+    this.loanProductSettingsForm
+      .get('multiDisburseLoan')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((multiDisburseLoan) => {
+        if (multiDisburseLoan) {
+          this.loanProductSettingsForm.addControl('maxTrancheCount', new UntypedFormControl('', Validators.required));
+          this.loanProductSettingsForm.addControl('outstandingLoanBalance', new UntypedFormControl(''));
+        } else {
+          this.loanProductSettingsForm.removeControl('maxTrancheCount');
+          this.loanProductSettingsForm.removeControl('outstandingLoanBalance');
+          this.loanProductSettingsForm.patchValue({
+            disallowExpectedDisbursements: false,
+            allowFullTermForTranche: false
+          });
+        }
+      });
 
-    this.loanProductSettingsForm.get('enableDownPayment').valueChanges.subscribe((enableDownPayment) => {
-      if (enableDownPayment) {
-        this.loanProductSettingsForm.addControl(
-          'disbursedAmountPercentageForDownPayment',
-          new UntypedFormControl(0, [
-            Validators.required,
-            rangeValidator(0, 100)
-          ])
-        );
-        this.loanProductSettingsForm.addControl('enableAutoRepaymentForDownPayment', new UntypedFormControl(false, []));
-      } else {
-        this.loanProductSettingsForm.removeControl('disbursedAmountPercentageForDownPayment');
-        this.loanProductSettingsForm.removeControl('enableAutoRepaymentForDownPayment');
-      }
-    });
+    this.loanProductSettingsForm
+      .get('enableDownPayment')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((enableDownPayment) => {
+        if (enableDownPayment) {
+          this.loanProductSettingsForm.addControl(
+            'disbursedAmountPercentageForDownPayment',
+            new UntypedFormControl(0, [
+              Validators.required,
+              rangeValidator(0, 100)
+            ])
+          );
+          this.loanProductSettingsForm.addControl(
+            'enableAutoRepaymentForDownPayment',
+            new UntypedFormControl(false, [])
+          );
+        } else {
+          this.loanProductSettingsForm.removeControl('disbursedAmountPercentageForDownPayment');
+          this.loanProductSettingsForm.removeControl('enableAutoRepaymentForDownPayment');
+        }
+      });
 
     this.loanProductSettingsForm
       .get('transactionProcessingStrategyCode')
-      .valueChanges.subscribe((transactionProcessingStrategyCode: string) => {
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((transactionProcessingStrategyCode: string) => {
         this.advancePaymentStrategy.emit(transactionProcessingStrategyCode);
         this.isAdvancedTransactionProcessingStrategy = LoanProducts.isAdvancedPaymentAllocationStrategy(
           transactionProcessingStrategyCode
@@ -625,7 +656,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
 
     this.loanProductSettingsForm
       .get('allowAttributeConfiguration')
-      .valueChanges.subscribe((allowAttributeConfiguration: any) => {
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((allowAttributeConfiguration: any) => {
         if (allowAttributeConfiguration) {
           allowAttributeOverrides.patchValue({
             amortizationType: true,
@@ -653,7 +685,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
 
     this.loanProductSettingsForm
       .get('useDueForRepaymentsConfigurations')
-      .valueChanges.subscribe((useDueForRepaymentsConfigurations: boolean) => {
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((useDueForRepaymentsConfigurations: boolean) => {
         if (useDueForRepaymentsConfigurations) {
           this.loanProductSettingsForm.patchValue({
             dueDaysForRepaymentEvent: null,
@@ -667,50 +700,53 @@ export class LoanProductSettingsStepComponent implements OnInit {
         }
       });
 
-    this.loanProductSettingsForm.get('loanScheduleType').valueChanges.subscribe((loanScheduleType: string) => {
-      this.transactionProcessingStrategyData = [];
-      if (loanScheduleType === LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE) {
-        // Filter Advanced Payment Allocation Strategy
-        this.transactionProcessingStrategyData = this.transactionProcessingStrategyDataBase.filter(
-          (cn: CodeName) => !LoanProducts.isAdvancedPaymentAllocationStrategy(cn.code)
-        );
-        if (
-          LoanProducts.isAdvancedPaymentAllocationStrategy(
-            this.loanProductSettingsForm.value.transactionProcessingStrategyCode
-          )
-        ) {
+    this.loanProductSettingsForm
+      .get('loanScheduleType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((loanScheduleType: string) => {
+        this.transactionProcessingStrategyData = [];
+        if (loanScheduleType === LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE) {
+          // Filter Advanced Payment Allocation Strategy
+          this.transactionProcessingStrategyData = this.transactionProcessingStrategyDataBase.filter(
+            (cn: CodeName) => !LoanProducts.isAdvancedPaymentAllocationStrategy(cn.code)
+          );
+          if (
+            LoanProducts.isAdvancedPaymentAllocationStrategy(
+              this.loanProductSettingsForm.value.transactionProcessingStrategyCode
+            )
+          ) {
+            this.loanProductSettingsForm.patchValue({
+              transactionProcessingStrategyCode: this.transactionProcessingStrategyData[0].code
+            });
+          }
+          this.advancedTransactionProcessingStrategyDisabled = false;
+          this.isAdvancedTransactionProcessingStrategy = false;
+          this.loanProductSettingsForm.removeControl('chargeOffBehaviour');
+          this.loanProductSettingsForm.patchValue({ allowFullTermForTranche: false });
+        } else {
+          // Only Advanced Payment Allocation Strategy
+          this.transactionProcessingStrategyDataBase.some((cn: CodeName) => {
+            if (LoanProducts.isAdvancedPaymentAllocationStrategy(cn.code)) {
+              this.transactionProcessingStrategyData.push(cn);
+            }
+          });
+          this.advancedTransactionProcessingStrategyDisabled = true;
           this.loanProductSettingsForm.patchValue({
             transactionProcessingStrategyCode: this.transactionProcessingStrategyData[0].code
           });
+          this.isAdvancedTransactionProcessingStrategy = true;
+          this.loanProductSettingsForm.addControl(
+            'chargeOffBehaviour',
+            new UntypedFormControl(this.loanProductsTemplate.chargeOffBehaviour.id)
+          );
+          this.validateAdvancedPaymentStrategyControls();
         }
-        this.advancedTransactionProcessingStrategyDisabled = false;
-        this.isAdvancedTransactionProcessingStrategy = false;
-        this.loanProductSettingsForm.removeControl('chargeOffBehaviour');
-        this.loanProductSettingsForm.patchValue({ allowFullTermForTranche: false });
-      } else {
-        // Only Advanced Payment Allocation Strategy
-        this.transactionProcessingStrategyDataBase.some((cn: CodeName) => {
-          if (LoanProducts.isAdvancedPaymentAllocationStrategy(cn.code)) {
-            this.transactionProcessingStrategyData.push(cn);
-          }
-        });
-        this.advancedTransactionProcessingStrategyDisabled = true;
-        this.loanProductSettingsForm.patchValue({
-          transactionProcessingStrategyCode: this.transactionProcessingStrategyData[0].code
-        });
-        this.isAdvancedTransactionProcessingStrategy = true;
-        this.loanProductSettingsForm.addControl(
-          'chargeOffBehaviour',
-          new UntypedFormControl(this.loanProductsTemplate.chargeOffBehaviour.id)
-        );
-        this.validateAdvancedPaymentStrategyControls();
-      }
-      if (this.loanProductSettingsForm.value.isInterestRecalculationEnabled) {
-        this.setRescheduleStrategies();
-      }
-      this.processingStrategyService.initialize(this.isAdvancedTransactionProcessingStrategy);
-      this.enableFieldsWhenScheduleTypeIsProgressiveAndInterestRateRecalculationEnabled();
-    });
+        if (this.loanProductSettingsForm.value.isInterestRecalculationEnabled) {
+          this.setRescheduleStrategies();
+        }
+        this.processingStrategyService.initialize(this.isAdvancedTransactionProcessingStrategy);
+        this.enableFieldsWhenScheduleTypeIsProgressiveAndInterestRateRecalculationEnabled();
+      });
   }
 
   private enableFieldsWhenScheduleTypeIsProgressiveAndInterestRateRecalculationEnabled() {
@@ -808,5 +844,10 @@ export class LoanProductSettingsStepComponent implements OnInit {
       this.loanProductSettingsForm.removeControl('loanScheduleProcessingType');
       this.loanProductSettingsForm.removeControl('daysInYearCustomStrategy');
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

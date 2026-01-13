@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, UntypedFormArray, UntypedFormControl } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -26,6 +26,7 @@ import { MatIconButton, MatButton } from '@angular/material/button';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 /**
  * Create Journal Entry component.
  */
@@ -41,7 +42,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class CreateJournalEntryComponent implements OnInit, AfterViewInit {
+export class CreateJournalEntryComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private accountingService = inject(AccountingService);
   private settingsService = inject(SettingsService);
@@ -100,15 +102,15 @@ export class CreateJournalEntryComponent implements OnInit, AfterViewInit {
    */
   constructor() {
     this.assetExternalizationEnabled = false;
-    this.route.data.subscribe(
-      (data: { offices: any; currencies: any; paymentTypes: any; glAccounts: any; globalConfig: any }) => {
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { offices: any; currencies: any; paymentTypes: any; glAccounts: any; globalConfig: any }) => {
         this.officeData = data.offices;
         this.currencyData = data.currencies.selectedCurrencyOptions;
         this.paymentTypeData = data.paymentTypes;
         this.glAccountData = data.glAccounts;
         this.assetExternalizationConfig = data.globalConfig;
-      }
-    );
+      });
   }
 
   /**
@@ -220,15 +222,18 @@ export class CreateJournalEntryComponent implements OnInit, AfterViewInit {
     if (!journalEntry['externalAssetOwner']) {
       delete journalEntry['externalAssetOwner'];
     }
-    this.accountingService.createJournalEntry(journalEntry).subscribe((response) => {
-      this.router.navigate(
-        [
-          '../transactions/view',
-          response.transactionId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.accountingService
+      .createJournalEntry(journalEntry)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response) => {
+        this.router.navigate(
+          [
+            '../transactions/view',
+            response.transactionId
+          ],
+          { relativeTo: this.route }
+        );
+      });
   }
 
   /**
@@ -288,15 +293,23 @@ export class CreateJournalEntryComponent implements OnInit, AfterViewInit {
         stepPercentage: 74
       }
     });
-    nextStepDialogRef.afterClosed().subscribe((response: { nextStep: boolean }) => {
-      if (response.nextStep) {
-        this.configurationWizardService.showCreateJournalEntries = false;
-        this.configurationWizardService.showCharges = true;
-        this.router.navigate(['/products']);
-      } else {
-        this.configurationWizardService.showCreateJournalEntries = false;
-        this.router.navigate(['/home']);
-      }
-    });
+    nextStepDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: { nextStep: boolean }) => {
+        if (response.nextStep) {
+          this.configurationWizardService.showCreateJournalEntries = false;
+          this.configurationWizardService.showCharges = true;
+          this.router.navigate(['/products']);
+        } else {
+          this.configurationWizardService.showCreateJournalEntries = false;
+          this.router.navigate(['/home']);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

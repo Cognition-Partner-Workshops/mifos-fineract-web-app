@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 
@@ -17,6 +17,7 @@ import { GlAccountSelectorComponent } from '../../../shared/accounting/gl-accoun
 import { MatCheckbox } from '@angular/material/checkbox';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit gl account component.
@@ -32,7 +33,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class EditGlAccountComponent implements OnInit {
+export class EditGlAccountComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
@@ -59,7 +61,7 @@ export class EditGlAccountComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { glAccountAndChartOfAccountsTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { glAccountAndChartOfAccountsTemplate: any }) => {
       this.glAccount = data.glAccountAndChartOfAccountsTemplate;
     });
   }
@@ -109,30 +111,33 @@ export class EditGlAccountComponent implements OnInit {
   setGLAccountForm() {
     this.accountTypeData = this.glAccount.accountTypeOptions;
     this.accountUsageData = this.glAccount.usageOptions;
-    this.glAccountForm.get('type').valueChanges.subscribe((accountTypeId) => {
-      switch (accountTypeId) {
-        case 1:
-          this.parentData = this.glAccount.assetHeaderAccountOptions;
-          this.tagData = this.glAccount.allowedAssetsTagOptions;
-          break;
-        case 2:
-          this.parentData = this.glAccount.liabilityHeaderAccountOptions;
-          this.tagData = this.glAccount.allowedLiabilitiesTagOptions;
-          break;
-        case 3:
-          this.parentData = this.glAccount.equityHeaderAccountOptions;
-          this.tagData = this.glAccount.allowedEquityTagOptions;
-          break;
-        case 4:
-          this.parentData = this.glAccount.incomeHeaderAccountOptions;
-          this.tagData = this.glAccount.allowedIncomeTagOptions;
-          break;
-        case 5:
-          this.parentData = this.glAccount.expenseHeaderAccountOptions;
-          this.tagData = this.glAccount.allowedExpensesTagOptions;
-          break;
-      }
-    });
+    this.glAccountForm
+      .get('type')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((accountTypeId) => {
+        switch (accountTypeId) {
+          case 1:
+            this.parentData = this.glAccount.assetHeaderAccountOptions;
+            this.tagData = this.glAccount.allowedAssetsTagOptions;
+            break;
+          case 2:
+            this.parentData = this.glAccount.liabilityHeaderAccountOptions;
+            this.tagData = this.glAccount.allowedLiabilitiesTagOptions;
+            break;
+          case 3:
+            this.parentData = this.glAccount.equityHeaderAccountOptions;
+            this.tagData = this.glAccount.allowedEquityTagOptions;
+            break;
+          case 4:
+            this.parentData = this.glAccount.incomeHeaderAccountOptions;
+            this.tagData = this.glAccount.allowedIncomeTagOptions;
+            break;
+          case 5:
+            this.parentData = this.glAccount.expenseHeaderAccountOptions;
+            this.tagData = this.glAccount.allowedExpensesTagOptions;
+            break;
+        }
+      });
 
     this.glAccountForm.get('type').setValue(this.glAccount.type.id);
   }
@@ -142,14 +147,22 @@ export class EditGlAccountComponent implements OnInit {
    * if successful redirects to view updated account.
    */
   submit() {
-    this.accountingService.updateGlAccount(this.glAccount.id, this.glAccountForm.value).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.accountingService
+      .updateGlAccount(this.glAccount.id, this.glAccountForm.value)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

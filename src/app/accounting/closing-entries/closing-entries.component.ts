@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -27,7 +27,7 @@ import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 /** rxjs Imports */
-import { startWith, map } from 'rxjs/operators';
+import { startWith, map, takeUntil } from 'rxjs/operators';
 
 /** Custom Services */
 import { PopoverService } from '../../configuration-wizard/popover/popover.service';
@@ -36,6 +36,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatAutocompleteTrigger, MatAutocomplete, MatOption } from '@angular/material/autocomplete';
 import { AsyncPipe } from '@angular/common';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject } from 'rxjs';
 
 /**
  * Closing entries component.
@@ -65,7 +66,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     AsyncPipe
   ]
 })
-export class ClosingEntriesComponent implements OnInit, AfterViewInit {
+export class ClosingEntriesComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private configurationWizardService = inject(ConfigurationWizardService);
@@ -111,7 +113,7 @@ export class ClosingEntriesComponent implements OnInit, AfterViewInit {
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { offices: any; glAccountClosures: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { offices: any; glAccountClosures: any }) => {
       this.officeData = data.offices;
       this.glAccountClosureData = data.glAccountClosures;
     });
@@ -130,7 +132,7 @@ export class ClosingEntriesComponent implements OnInit, AfterViewInit {
    * Filters data in closing entries table based on office name.
    */
   applyFilter() {
-    this.officeName.valueChanges.subscribe((filterValue: string) => {
+    this.officeName.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((filterValue: string) => {
       this.dataSource.filter = filterValue.trim().toLowerCase();
     });
   }
@@ -215,5 +217,10 @@ export class ClosingEntriesComponent implements OnInit, AfterViewInit {
     this.configurationWizardService.showClosingEntriesList = false;
     this.configurationWizardService.showClosingEntries = true;
     this.router.navigate(['/accounting']);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,10 +7,11 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLinkActive, RouterLink, RouterOutlet } from '@angular/router';
 import { MatTabNav, MatTabLink, MatTabNavPanel } from '@angular/material/tabs';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Fixed Deposit Product component.
@@ -28,13 +29,14 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     RouterOutlet
   ]
 })
-export class ViewFixedDepositProductComponent {
+export class ViewFixedDepositProductComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   fixedDepositDatatables: any = [];
 
   constructor() {
-    this.route.data.subscribe((data: { fixedDepositDatatables: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { fixedDepositDatatables: any }) => {
       this.fixedDepositDatatables = [];
       data.fixedDepositDatatables.forEach((datatable: any) => {
         if (datatable.entitySubType === 'Fixed Deposit') {
@@ -42,5 +44,10 @@ export class ViewFixedDepositProductComponent {
         }
       });
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -24,6 +24,7 @@ import { GlAccountSelectorComponent } from '../../../shared/accounting/gl-accoun
 import { MatCheckbox } from '@angular/material/checkbox';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create gl account component.
@@ -39,7 +40,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class CreateGlAccountComponent implements OnInit, AfterViewInit {
+export class CreateGlAccountComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
@@ -83,7 +85,7 @@ export class CreateGlAccountComponent implements OnInit, AfterViewInit {
    * @param {Matdialog} dialog Matdialog.
    */
   constructor() {
-    this.route.queryParamMap.subscribe((params) => {
+    this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe((params) => {
       this.accountTypeId = Number(params.get('accountType'));
       this.parentId = Number(params.get('parent'));
       if (this.parentId) {
@@ -91,7 +93,7 @@ export class CreateGlAccountComponent implements OnInit, AfterViewInit {
       }
     });
 
-    this.route.data.subscribe((data: { chartOfAccountsTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { chartOfAccountsTemplate: any }) => {
       this.chartOfAccountsData = data.chartOfAccountsTemplate;
       this.accountTypeData = data.chartOfAccountsTemplate.accountTypeOptions;
       this.accountUsageData = data.chartOfAccountsTemplate.usageOptions;
@@ -138,30 +140,33 @@ export class CreateGlAccountComponent implements OnInit, AfterViewInit {
    * Sets gl account form for selected account type.
    */
   setGLAccountForm() {
-    this.glAccountForm.get('type').valueChanges.subscribe((accountTypeId) => {
-      switch (accountTypeId) {
-        case 1:
-          this.parentData = this.chartOfAccountsData.assetHeaderAccountOptions;
-          this.tagData = this.chartOfAccountsData.allowedAssetsTagOptions;
-          break;
-        case 2:
-          this.parentData = this.chartOfAccountsData.liabilityHeaderAccountOptions;
-          this.tagData = this.chartOfAccountsData.allowedLiabilitiesTagOptions;
-          break;
-        case 3:
-          this.parentData = this.chartOfAccountsData.equityHeaderAccountOptions;
-          this.tagData = this.chartOfAccountsData.allowedEquityTagOptions;
-          break;
-        case 4:
-          this.parentData = this.chartOfAccountsData.incomeHeaderAccountOptions;
-          this.tagData = this.chartOfAccountsData.allowedIncomeTagOptions;
-          break;
-        case 5:
-          this.parentData = this.chartOfAccountsData.expenseHeaderAccountOptions;
-          this.tagData = this.chartOfAccountsData.allowedExpensesTagOptions;
-          break;
-      }
-    });
+    this.glAccountForm
+      .get('type')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((accountTypeId) => {
+        switch (accountTypeId) {
+          case 1:
+            this.parentData = this.chartOfAccountsData.assetHeaderAccountOptions;
+            this.tagData = this.chartOfAccountsData.allowedAssetsTagOptions;
+            break;
+          case 2:
+            this.parentData = this.chartOfAccountsData.liabilityHeaderAccountOptions;
+            this.tagData = this.chartOfAccountsData.allowedLiabilitiesTagOptions;
+            break;
+          case 3:
+            this.parentData = this.chartOfAccountsData.equityHeaderAccountOptions;
+            this.tagData = this.chartOfAccountsData.allowedEquityTagOptions;
+            break;
+          case 4:
+            this.parentData = this.chartOfAccountsData.incomeHeaderAccountOptions;
+            this.tagData = this.chartOfAccountsData.allowedIncomeTagOptions;
+            break;
+          case 5:
+            this.parentData = this.chartOfAccountsData.expenseHeaderAccountOptions;
+            this.tagData = this.chartOfAccountsData.allowedExpensesTagOptions;
+            break;
+        }
+      });
   }
 
   /**
@@ -172,20 +177,23 @@ export class CreateGlAccountComponent implements OnInit, AfterViewInit {
     if (this.glAccountForm.invalid) {
       return;
     }
-    this.accountingService.createGlAccount(this.glAccountForm.value).subscribe((response: any) => {
-      if (this.configurationWizardService.showChartofAccounts === true) {
-        this.configurationWizardService.showChartofAccounts = false;
-        this.openDialog();
-      } else {
-        this.router.navigate(
-          [
-            '../view',
-            response.resourceId
-          ],
-          { relativeTo: this.route }
-        );
-      }
-    });
+    this.accountingService
+      .createGlAccount(this.glAccountForm.value)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (this.configurationWizardService.showChartofAccounts === true) {
+          this.configurationWizardService.showChartofAccounts = false;
+          this.openDialog();
+        } else {
+          this.router.navigate(
+            [
+              '../view',
+              response.resourceId
+            ],
+            { relativeTo: this.route }
+          );
+        }
+      });
   }
 
   /**
@@ -242,20 +250,28 @@ export class CreateGlAccountComponent implements OnInit, AfterViewInit {
         stepName: 'GL account'
       }
     });
-    continueSetupDialogRef.afterClosed().subscribe((response: { step: number }) => {
-      if (response.step === 1) {
-        this.configurationWizardService.showChartofAccountsForm = false;
-        this.router.navigate(['../'], { relativeTo: this.route });
-      } else if (response.step === 2) {
-        this.configurationWizardService.showChartofAccountsForm = true;
-        this.router.routeReuseStrategy.shouldReuseRoute = () => false;
-        this.router.onSameUrlNavigation = 'reload';
-        this.router.navigate(['/accounting/chart-of-accounts/gl-accounts/create']);
-      } else if (response.step === 3) {
-        this.configurationWizardService.showChartofAccountsForm = false;
-        this.configurationWizardService.showAccountsLinked = true;
-        this.router.navigate(['/accounting']);
-      }
-    });
+    continueSetupDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: { step: number }) => {
+        if (response.step === 1) {
+          this.configurationWizardService.showChartofAccountsForm = false;
+          this.router.navigate(['../'], { relativeTo: this.route });
+        } else if (response.step === 2) {
+          this.configurationWizardService.showChartofAccountsForm = true;
+          this.router.routeReuseStrategy.shouldReuseRoute = () => false;
+          this.router.onSameUrlNavigation = 'reload';
+          this.router.navigate(['/accounting/chart-of-accounts/gl-accounts/create']);
+        } else if (response.step === 3) {
+          this.configurationWizardService.showChartofAccountsForm = false;
+          this.configurationWizardService.showAccountsLinked = true;
+          this.router.navigate(['/accounting']);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

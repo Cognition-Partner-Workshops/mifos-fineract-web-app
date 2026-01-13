@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLinkActive, RouterLink, RouterOutlet } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -41,6 +41,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatTabNav, MatTabLink, MatTabNavPanel } from '@angular/material/tabs';
 import { StatusLookupPipe } from '../../../pipes/status-lookup.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * RecurringDeposits Account View Component
@@ -74,7 +75,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     StatusLookupPipe
   ]
 })
-export class RecurringDepositsAccountViewComponent implements OnInit {
+export class RecurringDepositsAccountViewComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private recurringDepositsService = inject(RecurringDepositsService);
@@ -102,22 +104,24 @@ export class RecurringDepositsAccountViewComponent implements OnInit {
    * @param {RecurringDepositsService} recurringDepositsService RecurringDeposits Service
    */
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositsAccountData: any; savingsDatatables: any }) => {
-      this.recurringDepositsAccountData = data.recurringDepositsAccountData;
-      this.charges = this.recurringDepositsAccountData.charges;
-      this.savingsDatatables = data.savingsDatatables;
-      this.currency = this.recurringDepositsAccountData.currency;
-      this.isprematureAllowed = data.recurringDepositsAccountData.maturityDate != null;
-      if (this.router.url.includes('clients')) {
-        this.entityType = 'Client';
-      } else if (this.router.url.includes('groups')) {
-        this.entityType = 'Group';
-      } else if (this.router.url.includes('centers')) {
-        this.entityType = 'Center';
-      }
-      const status: any = data.recurringDepositsAccountData.status;
-      this.showTransactions = status.id >= 300;
-    });
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { recurringDepositsAccountData: any; savingsDatatables: any }) => {
+        this.recurringDepositsAccountData = data.recurringDepositsAccountData;
+        this.charges = this.recurringDepositsAccountData.charges;
+        this.savingsDatatables = data.savingsDatatables;
+        this.currency = this.recurringDepositsAccountData.currency;
+        this.isprematureAllowed = data.recurringDepositsAccountData.maturityDate != null;
+        if (this.router.url.includes('clients')) {
+          this.entityType = 'Client';
+        } else if (this.router.url.includes('groups')) {
+          this.entityType = 'Group';
+        } else if (this.router.url.includes('centers')) {
+          this.entityType = 'Center';
+        }
+        const status: any = data.recurringDepositsAccountData.status;
+        this.showTransactions = status.id >= 300;
+      });
   }
 
   ngOnInit() {
@@ -249,15 +253,19 @@ export class RecurringDepositsAccountViewComponent implements OnInit {
     const deleteRecurringDepositsAccountDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `Recurring deposit account with id: ${this.recurringDepositsAccountData.id}` }
     });
-    deleteRecurringDepositsAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.recurringDepositsService
-          .deleteRecurringDepositsAccount(this.recurringDepositsAccountData.id)
-          .subscribe(() => {
-            this.router.navigate(['../../'], { relativeTo: this.route });
-          });
-      }
-    });
+    deleteRecurringDepositsAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.recurringDepositsService
+            .deleteRecurringDepositsAccount(this.recurringDepositsAccountData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['../../'], { relativeTo: this.route });
+            });
+        }
+      });
   }
 
   /**
@@ -272,15 +280,19 @@ export class RecurringDepositsAccountViewComponent implements OnInit {
         )
       }
     });
-    calculateInterestAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
-        this.recurringDepositsService
-          .executeRecurringDepositsAccountCommand(this.recurringDepositsAccountData.id, 'calculateInterest', {})
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    calculateInterestAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.confirm) {
+          this.recurringDepositsService
+            .executeRecurringDepositsAccountCommand(this.recurringDepositsAccountData.id, 'calculateInterest', {})
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -293,15 +305,19 @@ export class RecurringDepositsAccountViewComponent implements OnInit {
         dialogContext: this.translateService.instant('labels.text.Are you sure you want to post interest') + ' ?'
       }
     });
-    postInterestAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
-        this.recurringDepositsService
-          .executeRecurringDepositsAccountCommand(this.recurringDepositsAccountData.id, 'postInterest', {})
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    postInterestAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.confirm) {
+          this.recurringDepositsService
+            .executeRecurringDepositsAccountCommand(this.recurringDepositsAccountData.id, 'postInterest', {})
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -315,17 +331,21 @@ export class RecurringDepositsAccountViewComponent implements OnInit {
         dialogContext: this.translateService.instant('labels.dialogContext.Enable withhold tax for this account ?')
       }
     });
-    deleteSavingsAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
-        this.savingsService
-          .executeSavingsAccountUpdateCommand(this.recurringDepositsAccountData.id, 'updateWithHoldTax', {
-            withHoldTax: true
-          })
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    deleteSavingsAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.confirm) {
+          this.savingsService
+            .executeSavingsAccountUpdateCommand(this.recurringDepositsAccountData.id, 'updateWithHoldTax', {
+              withHoldTax: true
+            })
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -339,16 +359,25 @@ export class RecurringDepositsAccountViewComponent implements OnInit {
         dialogContext: this.translateService.instant('labels.dialogContext.Disable withhold tax for this account ?')
       }
     });
-    disableWithHoldTaxDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
-        this.savingsService
-          .executeSavingsAccountUpdateCommand(this.recurringDepositsAccountData.id, 'updateWithHoldTax', {
-            withHoldTax: false
-          })
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    disableWithHoldTaxDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.confirm) {
+          this.savingsService
+            .executeSavingsAccountUpdateCommand(this.recurringDepositsAccountData.id, 'updateWithHoldTax', {
+              withHoldTax: false
+            })
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

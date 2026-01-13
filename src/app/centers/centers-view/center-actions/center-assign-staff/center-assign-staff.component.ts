@@ -7,13 +7,14 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 /** Custom Services */
 import { CentersService } from 'app/centers/centers.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Centers Assign Staff Component
@@ -26,7 +27,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class CenterAssignStaffComponent implements OnInit {
+export class CenterAssignStaffComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private centersService = inject(CentersService);
   private route = inject(ActivatedRoute);
@@ -47,7 +49,7 @@ export class CenterAssignStaffComponent implements OnInit {
    * @param {Router} router Router
    */
   constructor() {
-    this.route.data.subscribe((data: { centersActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { centersActionData: any }) => {
       this.centerData = data.centersActionData;
     });
   }
@@ -75,8 +77,14 @@ export class CenterAssignStaffComponent implements OnInit {
   submit() {
     this.centersService
       .executeGroupActionCommand(this.centerData.id, 'assignStaff', this.centerAssignStaffForm.value)
+      .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.router.navigate(['../../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

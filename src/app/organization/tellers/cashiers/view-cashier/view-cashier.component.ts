@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports. */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 /** Custom Dialogs */
@@ -19,6 +19,7 @@ import { OrganizationService } from 'app/organization/organization.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Cashier component.
@@ -33,7 +34,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ViewCashierComponent {
+export class ViewCashierComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private organizationService = inject(OrganizationService);
@@ -50,7 +52,7 @@ export class ViewCashierComponent {
    * @param {MatDialog} dialog Mat Dialog
    */
   constructor() {
-    this.route.data.subscribe((data: { cashier: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { cashier: any }) => {
       this.cashierData = data.cashier;
     });
   }
@@ -62,12 +64,23 @@ export class ViewCashierComponent {
     const deleteCashierDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `Cashier id: ${this.cashierData.id}` }
     });
-    deleteCashierDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.organizationService.deleteCashier(this.cashierData.tellerId, this.cashierData.id).subscribe(() => {
-          this.router.navigate(['../'], { relativeTo: this.route });
-        });
-      }
-    });
+    deleteCashierDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.organizationService
+            .deleteCashier(this.cashierData.tellerId, this.cashierData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['../'], { relativeTo: this.route });
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

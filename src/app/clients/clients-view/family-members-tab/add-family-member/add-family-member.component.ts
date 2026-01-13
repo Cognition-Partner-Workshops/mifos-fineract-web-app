@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -17,6 +17,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Add Family Member Component
@@ -30,7 +31,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatCheckbox
   ]
 })
-export class AddFamilyMemberComponent implements OnInit {
+export class AddFamilyMemberComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private dateUtils = inject(Dates);
   private router = inject(Router);
@@ -58,7 +60,7 @@ export class AddFamilyMemberComponent implements OnInit {
    * @param {SettingsService} settingsService Setting service
    */
   constructor() {
-    this.route.data.subscribe((data: { clientTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientTemplate: any }) => {
       this.addFamilyMemberTemplate = data.clientTemplate.familyMemberOptions;
     });
     this.clientId = this.route.parent.parent.snapshot.params['clientId'];
@@ -67,14 +69,17 @@ export class AddFamilyMemberComponent implements OnInit {
   ngOnInit() {
     this.maxDate = this.settingsService.businessDate;
     this.createAddFamilyMemberForm();
-    this.addFamilyMemberForm.get('dateOfBirth').valueChanges.subscribe((dateOfBirth: any) => {
-      if (dateOfBirth) {
-        const age = this.calculateAge(dateOfBirth);
-        this.addFamilyMemberForm.get('age').setValue(age);
-      } else {
-        this.addFamilyMemberForm.get('age').setValue('');
-      }
-    });
+    this.addFamilyMemberForm
+      .get('dateOfBirth')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((dateOfBirth: any) => {
+        if (dateOfBirth) {
+          const age = this.calculateAge(dateOfBirth);
+          this.addFamilyMemberForm.get('age').setValue(age);
+        } else {
+          this.addFamilyMemberForm.get('age').setValue('');
+        }
+      });
   }
 
   /**
@@ -161,8 +166,16 @@ export class AddFamilyMemberComponent implements OnInit {
       locale
     };
 
-    this.clientsService.addFamilyMember(this.clientId, data).subscribe((res) => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.clientsService
+      .addFamilyMember(this.clientId, data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((res) => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

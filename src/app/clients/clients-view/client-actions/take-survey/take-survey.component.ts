@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 /** Custom Services */
@@ -16,6 +16,7 @@ import { AuthenticationService } from '../../../../core/authentication/authentic
 import { MatRadioGroup, MatRadioButton } from '@angular/material/radio';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Take Survey Component
@@ -31,7 +32,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatRadioButton
   ]
 })
-export class TakeSurveyComponent {
+export class TakeSurveyComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private clientsService = inject(ClientsService);
   private router = inject(Router);
@@ -66,7 +68,7 @@ export class TakeSurveyComponent {
    * @param {AuthenticationService} authenticationService AuthenticationService
    */
   constructor() {
-    this.route.data.subscribe((data: { clientActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientActionData: any }) => {
       this.allSurveyData = data.clientActionData;
       this.clientId = this.route.parent.snapshot.params['clientId'];
     });
@@ -140,8 +142,16 @@ export class TakeSurveyComponent {
       }
     });
 
-    this.clientsService.createNewSurvey(this.surveyData.id, this.formData).subscribe(() => {
-      this.router.navigate(['../../general'], { relativeTo: this.route });
-    });
+    this.clientsService
+      .createNewSurvey(this.surveyData.id, this.formData)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.router.navigate(['../../general'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

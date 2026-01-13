@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -48,6 +48,7 @@ import {
 import { FindPipe } from '../../../pipes/find.pipe';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Tax Group component.
@@ -74,7 +75,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class CreateTaxGroupComponent implements OnInit {
+export class CreateTaxGroupComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private productsService = inject(ProductsService);
   private route = inject(ActivatedRoute);
@@ -115,7 +117,7 @@ export class CreateTaxGroupComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service.
    */
   constructor() {
-    this.route.data.subscribe((data: { taxGroupTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { taxGroupTemplate: any }) => {
       this.taxGroupTemplateData = data.taxGroupTemplate;
       this.taxComponentOptions = this.taxGroupTemplateData.taxComponents;
     });
@@ -166,11 +168,14 @@ export class CreateTaxGroupComponent implements OnInit {
       formfields: formfields
     };
     const taxComponentDialogRef = this.dialog.open(FormDialogComponent, { data });
-    taxComponentDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        this.taxComponentsDataSource = this.taxComponentsDataSource.concat(response.data.value);
-      }
-    });
+    taxComponentDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          this.taxComponentsDataSource = this.taxComponentsDataSource.concat(response.data.value);
+        }
+      });
   }
 
   /**
@@ -200,13 +205,16 @@ export class CreateTaxGroupComponent implements OnInit {
       formfields: formfields
     };
     const taxComponentDialogRef = this.dialog.open(FormDialogComponent, { data });
-    taxComponentDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const updatedMemeber = { ...taxComponent, ...response.data.value };
-        this.taxComponentsDataSource.splice(this.taxComponentsDataSource.indexOf(taxComponent), 1, updatedMemeber);
-        this.taxComponentsDataSource = this.taxComponentsDataSource.concat([]);
-      }
-    });
+    taxComponentDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const updatedMemeber = { ...taxComponent, ...response.data.value };
+          this.taxComponentsDataSource.splice(this.taxComponentsDataSource.indexOf(taxComponent), 1, updatedMemeber);
+          this.taxComponentsDataSource = this.taxComponentsDataSource.concat([]);
+        }
+      });
   }
 
   /**
@@ -216,12 +224,15 @@ export class CreateTaxGroupComponent implements OnInit {
     const dialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `this` }
     });
-    dialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.taxComponentsDataSource.splice(index, 1);
-        this.taxComponentsDataSource = this.taxComponentsDataSource.concat([]);
-      }
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.taxComponentsDataSource.splice(index, 1);
+          this.taxComponentsDataSource = this.taxComponentsDataSource.concat([]);
+        }
+      });
   }
 
   /**
@@ -240,14 +251,22 @@ export class CreateTaxGroupComponent implements OnInit {
     for (const taxComponent of taxGroup.taxComponents) {
       taxComponent.startDate = this.dateUtils.formatDate(taxComponent.startDate, dateFormat) || '';
     }
-    this.productsService.createTaxGroup(taxGroup).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.productsService
+      .createTaxGroup(taxGroup)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

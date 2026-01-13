@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import {
   MatTableDataSource,
@@ -34,6 +34,7 @@ import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.co
 import { MatTooltip } from '@angular/material/tooltip';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Recurring Deposits Standing Instructions Tab
@@ -58,7 +59,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class StandingInstructionsTabComponent implements OnInit {
+export class StandingInstructionsTabComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private recurringDepositsService = inject(RecurringDepositsService);
   private dialog = inject(MatDialog);
@@ -90,7 +92,7 @@ export class StandingInstructionsTabComponent implements OnInit {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.parent.data.subscribe((data: { recurringDepositsAccountData: any }) => {
+    this.route.parent.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountData: any }) => {
       this.recurringDepositsData = data.recurringDepositsAccountData;
     });
   }
@@ -110,6 +112,7 @@ export class StandingInstructionsTabComponent implements OnInit {
     const dateFormat = this.settingsService.dateFormat;
     this.recurringDepositsService
       .getStandingInstructions(clientId, clientName, accountId, locale, dateFormat)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: any) => {
         this.instructionsData = response.pageItems;
         this.dataSource.data = this.instructionsData;
@@ -121,10 +124,21 @@ export class StandingInstructionsTabComponent implements OnInit {
     const deleteStandingInstructionDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `standing instruction id: ${instructionId}` }
     });
-    deleteStandingInstructionDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.accountTransfersService.deleteStandingInstrucions(instructionId).subscribe(() => {});
-      }
-    });
+    deleteStandingInstructionDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.accountTransfersService
+            .deleteStandingInstrucions(instructionId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {});
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

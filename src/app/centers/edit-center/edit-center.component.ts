@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -22,6 +22,7 @@ import { CentersService } from '../centers.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Center component.
@@ -34,7 +35,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class EditCenterComponent implements OnInit {
+export class EditCenterComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -63,7 +65,7 @@ export class EditCenterComponent implements OnInit {
    * @param {Dates} dateUtils Date Utils to format date.
    */
   constructor() {
-    this.route.data.subscribe((data: { centerData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { centerData: any }) => {
       this.centerData = data.centerData;
       this.staffs = this.centerData.staffOptions;
     });
@@ -124,8 +126,16 @@ export class EditCenterComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.centersService.executeEditCenter(this.centerData.id, data).subscribe(() => {
-      this.router.navigate(['../general'], { relativeTo: this.route });
-    });
+    this.centersService
+      .executeEditCenter(this.centerData.id, data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.router.navigate(['../general'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

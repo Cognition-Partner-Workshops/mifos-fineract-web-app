@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
@@ -26,6 +26,7 @@ import {
 import { ProductsService } from 'app/products/products.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-view-dividend',
@@ -49,7 +50,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class ViewDividendComponent implements OnInit {
+export class ViewDividendComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private productsService = inject(ProductsService);
   private router = inject(Router);
@@ -69,7 +71,7 @@ export class ViewDividendComponent implements OnInit {
   dataSource: MatTableDataSource<any>;
 
   constructor() {
-    this.route.data.subscribe((data: { dividendData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { dividendData: any }) => {
       this.dividendData = data.dividendData;
     });
     this.status = this.route.snapshot.queryParams['status'];
@@ -89,6 +91,7 @@ export class ViewDividendComponent implements OnInit {
     const dividendId = this.route.snapshot.paramMap.get('dividendId');
     this.productsService
       .approveDividend(shareProductId, dividendId, { productId: shareProductId, dividendId: dividendId })
+      .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.router.navigate(['../'], { relativeTo: this.route });
       });
@@ -96,5 +99,10 @@ export class ViewDividendComponent implements OnInit {
 
   applyFilter(filterValue: string) {
     this.dataSource.filter = filterValue.trim().toLowerCase();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

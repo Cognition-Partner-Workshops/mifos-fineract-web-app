@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, Input, inject } from '@angular/core';
+import { Component, OnInit, Input, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -20,6 +20,7 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-fixed-deposit-product-settings-step',
@@ -35,7 +36,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatStepperNext
   ]
 })
-export class FixedDepositProductSettingsStepComponent implements OnInit {
+export class FixedDepositProductSettingsStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
 
   @Input() fixedDepositProductsTemplate: any;
@@ -119,13 +121,19 @@ export class FixedDepositProductSettingsStepComponent implements OnInit {
   }
 
   setConditionalControls() {
-    this.fixedDepositProductSettingsForm.get('withHoldTax').valueChanges.subscribe((withHoldTax: any) => {
-      if (withHoldTax) {
-        this.fixedDepositProductSettingsForm.addControl('taxGroupId', new UntypedFormControl('', Validators.required));
-      } else {
-        this.fixedDepositProductSettingsForm.removeControl('taxGroupId');
-      }
-    });
+    this.fixedDepositProductSettingsForm
+      .get('withHoldTax')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((withHoldTax: any) => {
+        if (withHoldTax) {
+          this.fixedDepositProductSettingsForm.addControl(
+            'taxGroupId',
+            new UntypedFormControl('', Validators.required)
+          );
+        } else {
+          this.fixedDepositProductSettingsForm.removeControl('taxGroupId');
+        }
+      });
   }
 
   get fixedDepositProductSettings() {
@@ -136,5 +144,10 @@ export class FixedDepositProductSettingsStepComponent implements OnInit {
       }
     }
     return fixedDepositProductSettings;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

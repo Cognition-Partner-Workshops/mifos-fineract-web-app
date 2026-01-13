@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { CollectionsService } from '../collections.service';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -19,6 +19,7 @@ import { CentersService } from 'app/centers/centers.service';
 import { GroupsService } from 'app/groups/groups.service';
 import { Dates } from 'app/core/utils/dates';
 import { CollectionSheetData, JLGGroupData, MeetingFallCenter } from '../models/collection-sheet-data.model';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-collection-sheet',
@@ -29,7 +30,8 @@ import { CollectionSheetData, JLGGroupData, MeetingFallCenter } from '../models/
     FaIconComponent
   ]
 })
-export class CollectionSheetComponent implements OnInit {
+export class CollectionSheetComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private centerService = inject(CentersService);
   private collectionsService = inject(CollectionsService);
@@ -68,7 +70,7 @@ export class CollectionSheetComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { officesData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { officesData: any }) => {
       this.officesData = data.officesData;
     });
   }
@@ -106,18 +108,30 @@ export class CollectionSheetComponent implements OnInit {
    * Checks for the office id value change
    */
   buildDependencies() {
-    this.collectionSheetForm.get('officeId').valueChanges.subscribe((officeId: any) => {
-      this.officeId = officeId;
-      this.organizationService.getStaffs(officeId).subscribe((response: any) => {
-        this.loanOfficerData = response;
+    this.collectionSheetForm
+      .get('officeId')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((officeId: any) => {
+        this.officeId = officeId;
+        this.organizationService
+          .getStaffs(officeId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((response: any) => {
+            this.loanOfficerData = response;
+          });
+        this.organizationService
+          .getCenters(officeId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((response: any) => {
+            this.centersData = response;
+          });
+        this.organizationService
+          .getGroups(officeId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((response: any) => {
+            this.groupsData = response;
+          });
       });
-      this.organizationService.getCenters(officeId).subscribe((response: any) => {
-        this.centersData = response;
-      });
-      this.organizationService.getGroups(officeId).subscribe((response: any) => {
-        this.groupsData = response;
-      });
-    });
   }
 
   previewCollectionSheet() {
@@ -128,6 +142,7 @@ export class CollectionSheetComponent implements OnInit {
 
     this.centerService
       .getAllMeetingFallCenters(this.officeId, staffId, meetingDate, dateFormat, locale)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: CollectionSheetData[]) => {
         if (response.length > 0) {
           this.meetingFallCenters = response[0].meetingFallCenters;
@@ -139,10 +154,16 @@ export class CollectionSheetComponent implements OnInit {
           };
           this.collectionsService
             .generateCollectionSheetData(this.meetingFallCenters[0].id, payload)
+            .pipe(takeUntil(this.destroy$))
             .subscribe((jlgGroupData: JLGGroupData) => {
               console.log(jlgGroupData);
             });
         }
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

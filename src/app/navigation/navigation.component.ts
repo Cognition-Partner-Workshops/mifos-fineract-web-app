@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 
@@ -21,6 +21,7 @@ import { CenterNavigationComponent } from './center-navigation/center-navigation
 import { GroupNavigationComponent } from './group-navigation/group-navigation.component';
 import { ClientNavigationComponent } from './client-navigation/client-navigation.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Navigation component.
@@ -38,7 +39,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ClientNavigationComponent
   ]
 })
-export class NavigationComponent implements OnInit {
+export class NavigationComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private navigationService = inject(NavigationService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -87,7 +89,7 @@ export class NavigationComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { offices: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { offices: any }) => {
       this.officeData = data.offices;
     });
   }
@@ -107,7 +109,7 @@ export class NavigationComponent implements OnInit {
    * Sets the office selector
    */
   setOfficeSelector() {
-    this.officeSelector.valueChanges.subscribe((officeId) => {
+    this.officeSelector.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((officeId) => {
       this.employeeSelector.reset(null, { emitEvent: false });
       this.centerSelector.reset(null, { emitEvent: false });
       this.groupSelector.reset(null, { emitEvent: false });
@@ -118,14 +120,17 @@ export class NavigationComponent implements OnInit {
       this.clientData = null;
       this.selectedItem = this.officeData.find((office: any) => office.id === officeId);
       this.selectedItem.itemType = 'office';
-      this.navigationService.getEmployees(officeId).subscribe((employees: any) => {
-        this.employeeData = employees;
-        if (this.employeeData.length) {
-          this.employeeSelector.enable();
-        } else {
-          this.employeeSelector.disable();
-        }
-      });
+      this.navigationService
+        .getEmployees(officeId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe((employees: any) => {
+          this.employeeData = employees;
+          if (this.employeeData.length) {
+            this.employeeSelector.enable();
+          } else {
+            this.employeeSelector.disable();
+          }
+        });
     });
   }
 
@@ -133,7 +138,7 @@ export class NavigationComponent implements OnInit {
    * Sets the employee selector
    */
   setEmployeeSelector() {
-    this.employeeSelector.valueChanges.subscribe((employeeId) => {
+    this.employeeSelector.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((employeeId) => {
       if (employeeId) {
         this.centerSelector.reset(null, { emitEvent: false });
         this.groupSelector.reset(null, { emitEvent: false });
@@ -143,14 +148,17 @@ export class NavigationComponent implements OnInit {
         this.clientData = null;
         this.selectedItem = this.employeeData.find((employee: any) => employee.id === employeeId);
         this.selectedItem.itemType = 'employee';
-        this.navigationService.getCentersFromStaffId(employeeId).subscribe((centers: any) => {
-          this.centerData = centers;
-          if (this.centerData.length) {
-            this.centerSelector.enable();
-          } else {
-            this.centerSelector.disable();
-          }
-        });
+        this.navigationService
+          .getCentersFromStaffId(employeeId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((centers: any) => {
+            this.centerData = centers;
+            if (this.centerData.length) {
+              this.centerSelector.enable();
+            } else {
+              this.centerSelector.disable();
+            }
+          });
       }
     });
   }
@@ -159,30 +167,39 @@ export class NavigationComponent implements OnInit {
    * Sets the center selector
    */
   setCenterSelector() {
-    this.centerSelector.valueChanges.subscribe((centerId) => {
+    this.centerSelector.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((centerId) => {
       if (centerId) {
         this.groupSelector.reset(null, { emitEvent: false });
         this.clientSelector.reset(null, { emitEvent: false });
         this.groupData = null;
         this.clientData = null;
-        this.navigationService.getCenter(centerId).subscribe((center: any) => {
-          this.selectedItem = center;
-          this.selectedItem.itemType = 'center';
-          this.groupData = center.groupMembers ? center.groupMembers : [];
-          if (this.groupData.length) {
-            this.groupSelector.enable();
-          } else {
-            this.groupSelector.disable();
-          }
-        });
+        this.navigationService
+          .getCenter(centerId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((center: any) => {
+            this.selectedItem = center;
+            this.selectedItem.itemType = 'center';
+            this.groupData = center.groupMembers ? center.groupMembers : [];
+            if (this.groupData.length) {
+              this.groupSelector.enable();
+            } else {
+              this.groupSelector.disable();
+            }
+          });
         this.selectedItemAccounts = null;
-        this.navigationService.getCenterAccounts(centerId).subscribe((centerAccounts: any) => {
-          this.selectedItemAccounts = centerAccounts;
-        });
+        this.navigationService
+          .getCenterAccounts(centerId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((centerAccounts: any) => {
+            this.selectedItemAccounts = centerAccounts;
+          });
         this.selectedItemSummary = null;
-        this.navigationService.getCenterSummary(centerId).subscribe((centerSummary: any) => {
-          this.selectedItemSummary = centerSummary[0];
-        });
+        this.navigationService
+          .getCenterSummary(centerId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((centerSummary: any) => {
+            this.selectedItemSummary = centerSummary[0];
+          });
       }
     });
   }
@@ -191,24 +208,30 @@ export class NavigationComponent implements OnInit {
    * Sets the group selector
    */
   setGroupSelector() {
-    this.groupSelector.valueChanges.subscribe((groupId) => {
+    this.groupSelector.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((groupId) => {
       if (groupId) {
         this.clientSelector.reset(null, { emitEvent: false });
         this.clientData = null;
-        this.navigationService.getGroup(groupId).subscribe((group: any) => {
-          this.selectedItem = group;
-          this.selectedItem.itemType = 'group';
-          this.clientData = group.clientMembers ? group.clientMembers : [];
-          if (this.clientData.length) {
-            this.clientSelector.enable();
-          } else {
-            this.clientSelector.disable();
-          }
-        });
+        this.navigationService
+          .getGroup(groupId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((group: any) => {
+            this.selectedItem = group;
+            this.selectedItem.itemType = 'group';
+            this.clientData = group.clientMembers ? group.clientMembers : [];
+            if (this.clientData.length) {
+              this.clientSelector.enable();
+            } else {
+              this.clientSelector.disable();
+            }
+          });
         this.selectedItemAccounts = null;
-        this.navigationService.getGroupAccounts(groupId).subscribe((groupAccounts: any) => {
-          this.selectedItemAccounts = groupAccounts;
-        });
+        this.navigationService
+          .getGroupAccounts(groupId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((groupAccounts: any) => {
+            this.selectedItemAccounts = groupAccounts;
+          });
       }
     });
   }
@@ -217,17 +240,28 @@ export class NavigationComponent implements OnInit {
    * Sets the client selector
    */
   setClientSelector() {
-    this.clientSelector.valueChanges.subscribe((clientId) => {
+    this.clientSelector.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((clientId) => {
       if (clientId) {
         this.selectedItemAccounts = null;
-        this.navigationService.getClient(clientId).subscribe((client: any) => {
-          this.selectedItem = client;
-          this.selectedItem.itemType = 'client';
-        });
-        this.navigationService.getClientAccounts(clientId).subscribe((clientAccounts: any) => {
-          this.selectedItemAccounts = clientAccounts;
-        });
+        this.navigationService
+          .getClient(clientId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((client: any) => {
+            this.selectedItem = client;
+            this.selectedItem.itemType = 'client';
+          });
+        this.navigationService
+          .getClientAccounts(clientId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((clientAccounts: any) => {
+            this.selectedItemAccounts = clientAccounts;
+          });
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

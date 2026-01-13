@@ -6,10 +6,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { EntityDatatableTabComponent } from '../../../../shared/tabs/entity-datatable-tab/entity-datatable-tab.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-saving-product-datatable-tab',
@@ -20,7 +21,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     EntityDatatableTabComponent
   ]
 })
-export class SavingProductDatatableTabComponent {
+export class SavingProductDatatableTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   entityId: string;
@@ -30,9 +32,14 @@ export class SavingProductDatatableTabComponent {
   constructor() {
     this.entityId = this.route.parent.parent.snapshot.paramMap.get('productId');
 
-    this.route.data.subscribe((data: { savingProductDatatable: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { savingProductDatatable: any }) => {
       this.entityDatatable = data.savingProductDatatable;
       this.multiRowDatatableFlag = this.entityDatatable.columnHeaders[0].columnName === 'id' ? true : false;
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

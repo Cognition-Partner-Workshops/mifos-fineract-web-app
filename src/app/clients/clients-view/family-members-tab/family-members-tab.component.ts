@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterOutlet, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -28,6 +28,7 @@ import { MatDivider } from '@angular/material/divider';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { YesnoPipe } from '../../../pipes/yesno.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Client Family Members Tab
@@ -50,7 +51,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     YesnoPipe
   ]
 })
-export class FamilyMembersTabComponent {
+export class FamilyMembersTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private clientsService = inject(ClientsService);
   dialog = inject(MatDialog);
@@ -64,7 +66,7 @@ export class FamilyMembersTabComponent {
    * @param {MatDialog }dialog Mat Dialog
    */
   constructor() {
-    this.route.data.subscribe((data: { clientFamilyMembers: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientFamilyMembers: any }) => {
       this.clientFamilyMembers = data.clientFamilyMembers;
     });
   }
@@ -76,13 +78,19 @@ export class FamilyMembersTabComponent {
     const deleteFamilyMemberDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `Family member id:${id} name : ${name} ${index}` }
     });
-    deleteFamilyMemberDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.clientsService.deleteFamilyMember(clientId, id).subscribe(() => {
-          this.clientFamilyMembers.splice(index, 1);
-        });
-      }
-    });
+    deleteFamilyMemberDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.clientsService
+            .deleteFamilyMember(clientId, id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.clientFamilyMembers.splice(index, 1);
+            });
+        }
+      });
   }
 
   displayName(member: any): string {
@@ -94,5 +102,10 @@ export class FamilyMembersTabComponent {
       fullName = fullName + ' ' + member.lastName;
     }
     return fullName;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

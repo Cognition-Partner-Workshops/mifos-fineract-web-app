@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator } from '@angular/material/paginator';
 import {
@@ -28,6 +28,7 @@ import { NgClass } from '@angular/common';
 import { StatusLookupPipe } from '../../../../pipes/status-lookup.pipe';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Client Charge Overview component.
@@ -54,7 +55,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ChargesOverviewComponent implements OnInit {
+export class ChargesOverviewComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   dialog = inject(MatDialog);
 
@@ -81,7 +83,7 @@ export class ChargesOverviewComponent implements OnInit {
    * @param {MatDialog} dialog Dialog reference.
    */
   constructor() {
-    this.route.data.subscribe((data: { clientChargesData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientChargesData: any }) => {
       this.chargeOverviewData = data.clientChargesData;
     });
   }
@@ -96,5 +98,10 @@ export class ChargesOverviewComponent implements OnInit {
   setLoanClientChargeOverview() {
     this.dataSource = new MatTableDataSource(this.chargeOverviewData.pageItems);
     this.dataSource.paginator = this.paginator;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

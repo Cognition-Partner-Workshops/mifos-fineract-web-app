@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, Output, Input, EventEmitter, inject } from '@angular/core';
+import { Component, OnInit, Output, Input, EventEmitter, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   Validators,
@@ -25,6 +25,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { EditBusinessRuleParametersComponent } from './edit-business-rule-parameters/edit-business-rule-parameters.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit SMS Campaign step.
@@ -39,7 +40,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     EditBusinessRuleParametersComponent
   ]
 })
-export class EditSmsCampaignStepComponent implements OnInit {
+export class EditSmsCampaignStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private reportService = inject(ReportsService);
   private settingsService = inject(SettingsService);
@@ -121,9 +123,12 @@ export class EditSmsCampaignStepComponent implements OnInit {
    * Gets Template parameters and disables the SMS form.
    */
   getParameters() {
-    this.reportService.getReportParams(this.smsCampaign.reportName).subscribe((response: ReportParameter[]) => {
-      this.paramData = response;
-    });
+    this.reportService
+      .getReportParams(this.smsCampaign.reportName)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: ReportParameter[]) => {
+        this.paramData = response;
+      });
     this.smsCampaignDetailsForm.disable();
   }
 
@@ -144,5 +149,10 @@ export class EditSmsCampaignStepComponent implements OnInit {
         new UntypedFormControl(new Date(this.smsCampaign.recurrenceStartDate))
       );
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

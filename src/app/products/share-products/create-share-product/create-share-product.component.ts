@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, ViewChild, inject } from '@angular/core';
+import { Component, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 /** Custom Components */
@@ -27,6 +27,7 @@ import { MatStepper, MatStepperIcon, MatStep, MatStepLabel } from '@angular/mate
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { ShareProductPreviewStepComponent } from '../share-product-stepper/share-product-preview-step/share-product-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-create-share-product',
@@ -49,7 +50,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ShareProductPreviewStepComponent
   ]
 })
-export class CreateShareProductComponent {
+export class CreateShareProductComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private productsService = inject(ProductsService);
   private router = inject(Router);
@@ -81,7 +83,7 @@ export class CreateShareProductComponent {
    */
 
   constructor() {
-    this.route.data.subscribe((data: { shareProductsTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { shareProductsTemplate: any }) => {
       this.shareProductsTemplate = data.shareProductsTemplate;
     });
     this.accountingRuleData = this.accounting.getAccountingRulesForShares();
@@ -141,14 +143,22 @@ export class CreateShareProductComponent {
       chargesSelected: this.shareProduct.chargesSelected.map((charge: any) => ({ id: charge.id })),
       locale: this.settingsService.language.code // locale required for digitsAfterDecimal
     };
-    this.productsService.createShareProduct(shareProduct).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.productsService
+      .createShareProduct(shareProduct)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

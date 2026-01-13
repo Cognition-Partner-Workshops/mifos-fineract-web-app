@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
@@ -34,6 +34,7 @@ import { DeleteDialogComponent } from '../../shared/delete-dialog/delete-dialog.
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatTooltip } from '@angular/material/tooltip';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Payment Types component.
@@ -61,7 +62,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class PaymentTypesComponent implements OnInit {
+export class PaymentTypesComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private organizationService = inject(OrganizationService);
   private route = inject(ActivatedRoute);
   private dialog = inject(MatDialog);
@@ -93,7 +95,7 @@ export class PaymentTypesComponent implements OnInit {
    * @param {MatDialog} dialog Dialog reference.
    */
   constructor() {
-    this.route.data.subscribe((data: { paymentTypes: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { paymentTypes: any }) => {
       this.paymentTypesData = data.paymentTypes;
     });
   }
@@ -130,13 +132,26 @@ export class PaymentTypesComponent implements OnInit {
     const deletePaymentTypeDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `payment type ${paymentTypeId}` }
     });
-    deletePaymentTypeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.organizationService.deletePaymentType(paymentTypeId).subscribe(() => {
-          this.paymentTypesData = this.paymentTypesData.filter((paymentType: any) => paymentType.id !== paymentTypeId);
-          this.setPaymentTypes();
-        });
-      }
-    });
+    deletePaymentTypeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.organizationService
+            .deletePaymentType(paymentTypeId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.paymentTypesData = this.paymentTypesData.filter(
+                (paymentType: any) => paymentType.id !== paymentTypeId
+              );
+              this.setPaymentTypes();
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

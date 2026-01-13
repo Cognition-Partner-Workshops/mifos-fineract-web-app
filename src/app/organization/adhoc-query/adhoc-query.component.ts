@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -26,7 +26,7 @@ import {
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 /** rxjs Imports */
-import { of } from 'rxjs';
+import { of, Subject, takeUntil } from 'rxjs';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatTooltip } from '@angular/material/tooltip';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
@@ -57,7 +57,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class AdhocQueryComponent implements OnInit {
+export class AdhocQueryComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Adhoc Queries data. */
@@ -85,7 +86,7 @@ export class AdhocQueryComponent implements OnInit {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { adhocQueries: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { adhocQueries: any }) => {
       this.adhocQueriesData = data.adhocQueries;
     });
   }
@@ -126,5 +127,10 @@ export class AdhocQueryComponent implements OnInit {
     this.dataSource = new MatTableDataSource(this.adhocQueriesData);
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

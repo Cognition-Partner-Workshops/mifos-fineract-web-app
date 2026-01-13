@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
@@ -31,6 +31,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { YesnoPipe } from '../../../pipes/yesno.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Floating Rate Component.
@@ -62,7 +63,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     YesnoPipe
   ]
 })
-export class ViewFloatingRateComponent implements OnInit {
+export class ViewFloatingRateComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Floating Rate Data. */
@@ -86,7 +88,7 @@ export class ViewFloatingRateComponent implements OnInit {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { floatingRate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { floatingRate: any }) => {
       this.floatingRateData = data.floatingRate;
     });
   }
@@ -105,5 +107,10 @@ export class ViewFloatingRateComponent implements OnInit {
     this.dataSource = new MatTableDataSource(this.floatingRateData.ratePeriods);
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

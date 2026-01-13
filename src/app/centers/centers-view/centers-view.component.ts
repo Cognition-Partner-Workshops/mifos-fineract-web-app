@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -38,6 +38,7 @@ import { MatTabNav, MatTabLink, MatTabNavPanel } from '@angular/material/tabs';
 import { StatusLookupPipe } from '../../pipes/status-lookup.pipe';
 import { DateFormatPipe } from '../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 /**
  * Create Center View
  */
@@ -71,7 +72,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class CentersViewComponent implements OnInit {
+export class CentersViewComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   dialog = inject(MatDialog);
@@ -90,7 +92,7 @@ export class CentersViewComponent implements OnInit {
    * @param route route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { centerViewData: any; centerDatatables: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { centerViewData: any; centerDatatables: any }) => {
       this.centerViewData = data.centerViewData;
       this.centerDatatables = data.centerDatatables;
     });
@@ -157,15 +159,21 @@ export class CentersViewComponent implements OnInit {
         dialogContext: this.translateService.instant('labels.dialogContext.Are you sure you want Unassign Staff')
       }
     });
-    unAssignStaffDialogRef.afterClosed().subscribe((response: { confirm: any }) => {
-      if (response.confirm) {
-        this.centersService
-          .executeGroupActionCommand(this.centerViewData.id, 'unassignStaff', { staffId: this.centerViewData.staffId })
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    unAssignStaffDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: { confirm: any }) => {
+        if (response.confirm) {
+          this.centersService
+            .executeGroupActionCommand(this.centerViewData.id, 'unassignStaff', {
+              staffId: this.centerViewData.staffId
+            })
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -175,13 +183,19 @@ export class CentersViewComponent implements OnInit {
     const deleteGroupDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `center with id: ${this.centerViewData.id}` }
     });
-    deleteGroupDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.centersService.deleteCenter(this.centerViewData.id).subscribe(() => {
-          this.router.navigate(['/centers'], { relativeTo: this.route });
-        });
-      }
-    });
+    deleteGroupDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.centersService
+            .deleteCenter(this.centerViewData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['/centers'], { relativeTo: this.route });
+            });
+        }
+      });
   }
 
   /**
@@ -191,5 +205,10 @@ export class CentersViewComponent implements OnInit {
   reload() {
     const url: string = this.router.url;
     this.router.navigateByUrl(`/centers`, { skipLocationChange: true }).then(() => this.router.navigate([url]));
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

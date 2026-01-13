@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, QueryList, ViewChild, ViewChildren, inject } from '@angular/core';
+import { Component, QueryList, ViewChild, ViewChildren, inject, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 
 /** Custom Services */
@@ -25,6 +25,7 @@ import { MatStepper, MatStepperIcon, MatStep, MatStepLabel } from '@angular/mate
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { ClientPreviewStepComponent } from '../client-stepper/client-preview-step/client-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Client Component.
@@ -47,7 +48,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ClientPreviewStepComponent
   ]
 })
-export class CreateClientComponent {
+export class CreateClientComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private clientsService = inject(ClientsService);
@@ -78,11 +80,13 @@ export class CreateClientComponent {
    * @param {SettingsService} settingsService Setting service
    */
   constructor() {
-    this.route.data.subscribe((data: { clientTemplate: any; clientAddressFieldConfig: any }) => {
-      this.clientTemplate = data.clientTemplate;
-      this.clientAddressFieldConfig = data.clientAddressFieldConfig;
-      this.setDatatables();
-    });
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { clientTemplate: any; clientAddressFieldConfig: any }) => {
+        this.clientTemplate = data.clientTemplate;
+        this.clientAddressFieldConfig = data.clientAddressFieldConfig;
+        this.setDatatables();
+      });
   }
 
   /**
@@ -164,14 +168,22 @@ export class CreateClientComponent {
       clientData['datatables'] = datatables;
     }
 
-    this.clientsService.createClient(clientData).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.clientsService
+      .createClient(clientData)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

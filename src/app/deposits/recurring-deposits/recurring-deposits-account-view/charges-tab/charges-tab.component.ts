@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import {
@@ -42,6 +42,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { MatTooltip } from '@angular/material/tooltip';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Charges Tab Component
@@ -66,7 +67,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ChargesTabComponent implements OnInit {
+export class ChargesTabComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private savingsService = inject(SavingsService);
   private dateUtils = inject(Dates);
@@ -106,7 +108,7 @@ export class ChargesTabComponent implements OnInit {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.parent.data.subscribe((data: { recurringDepositsAccountData: any }) => {
+    this.route.parent.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountData: any }) => {
       this.recurringDepositsAccountData = data.recurringDepositsAccountData;
       this.chargesData = this.recurringDepositsAccountData.charges;
     });
@@ -144,23 +146,32 @@ export class ChargesTabComponent implements OnInit {
       formfields: formfields
     };
     const payChargeDialogRef = this.dialog.open(FormDialogComponent, { data });
-    payChargeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const locale = this.settingsService.language.code;
-        const dateFormat = this.settingsService.dateFormat;
-        const dataObject = {
-          ...response.data.value,
-          dueDate: this.dateUtils.formatDate(response.data.value.dueDate, dateFormat),
-          dateFormat,
-          locale
-        };
-        this.savingsService
-          .executeSavingsAccountChargesCommand(this.recurringDepositsAccountData.id, 'paycharge', dataObject, chargeId)
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    payChargeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const locale = this.settingsService.language.code;
+          const dateFormat = this.settingsService.dateFormat;
+          const dataObject = {
+            ...response.data.value,
+            dueDate: this.dateUtils.formatDate(response.data.value.dueDate, dateFormat),
+            dateFormat,
+            locale
+          };
+          this.savingsService
+            .executeSavingsAccountChargesCommand(
+              this.recurringDepositsAccountData.id,
+              'paycharge',
+              dataObject,
+              chargeId
+            )
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -176,15 +187,19 @@ export class ChargesTabComponent implements OnInit {
           `${chargeId} ?`
       }
     });
-    waiveChargeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
-        this.savingsService
-          .executeSavingsAccountChargesCommand(this.recurringDepositsAccountData.id, 'waive', {}, chargeId)
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    waiveChargeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.confirm) {
+          this.savingsService
+            .executeSavingsAccountChargesCommand(this.recurringDepositsAccountData.id, 'waive', {}, chargeId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -207,22 +222,26 @@ export class ChargesTabComponent implements OnInit {
       formfields: formfields
     };
     const editChargeDialogRef = this.dialog.open(FormDialogComponent, { data });
-    editChargeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const locale = 'en';
-        const dateFormat = 'dd MMMM yyyy';
-        const dataObject = {
-          ...response.data.value,
-          dateFormat,
-          locale
-        };
-        this.savingsService
-          .editSavingsAccountCharge(this.recurringDepositsAccountData.id, dataObject, charge.id)
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    editChargeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const locale = 'en';
+          const dateFormat = 'dd MMMM yyyy';
+          const dataObject = {
+            ...response.data.value,
+            dateFormat,
+            locale
+          };
+          this.savingsService
+            .editSavingsAccountCharge(this.recurringDepositsAccountData.id, dataObject, charge.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -233,13 +252,19 @@ export class ChargesTabComponent implements OnInit {
     const deleteChargeDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `charge id:${chargeId}` }
     });
-    deleteChargeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.savingsService.deleteSavingsAccountCharge(this.recurringDepositsAccountData.id, chargeId).subscribe(() => {
-          this.reload();
-        });
-      }
-    });
+    deleteChargeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.savingsService
+            .deleteSavingsAccountCharge(this.recurringDepositsAccountData.id, chargeId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -260,5 +285,10 @@ export class ChargesTabComponent implements OnInit {
     this.router
       .navigateByUrl(`/clients/${clientId}/recurring-deposits-accounts`, { skipLocationChange: true })
       .then(() => this.router.navigate([url]));
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

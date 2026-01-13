@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import {
@@ -41,6 +41,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { FindPipe } from '../../../pipes/find.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { TranslateService } from '@ngx-translate/core';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Loan Provisioning Criteria Component.
@@ -66,7 +67,8 @@ import { TranslateService } from '@ngx-translate/core';
     FindPipe
   ]
 })
-export class CreateLoanProvisioningCriteriaComponent implements OnInit {
+export class CreateLoanProvisioningCriteriaComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
   private settingsService = inject(SettingsService);
@@ -116,7 +118,7 @@ export class CreateLoanProvisioningCriteriaComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { loanProvisioningCriteriaTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { loanProvisioningCriteriaTemplate: any }) => {
       this.loanProvisioningCriteriaTemplate = data.loanProvisioningCriteriaTemplate;
       this.definitions = this.loanProvisioningCriteriaTemplate.definitions;
       this.liabilityAccounts = this.loanProvisioningCriteriaTemplate.glAccounts.filter(
@@ -160,18 +162,21 @@ export class CreateLoanProvisioningCriteriaComponent implements OnInit {
       layout: { addButtonText: 'Confirm' }
     };
     const editDefinitionDialogRef = this.dialog.open(FormDialogComponent, { data });
-    editDefinitionDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const definitionData = {
-          ...response.data.value,
-          categoryName: definition.categoryName,
-          categoryId: definition.categoryId
-        };
-        this.definitions.splice(this.definitions.indexOf(definition), 1, definitionData);
-        this.definitions = this.definitions.concat([]);
-        this.isDefinitionValid[definition.categoryName] = true;
-      }
-    });
+    editDefinitionDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const definitionData = {
+            ...response.data.value,
+            categoryName: definition.categoryName,
+            categoryId: definition.categoryId
+          };
+          this.definitions.splice(this.definitions.indexOf(definition), 1, definitionData);
+          this.definitions = this.definitions.concat([]);
+          this.isDefinitionValid[definition.categoryName] = true;
+        }
+      });
   }
 
   /**
@@ -258,14 +263,22 @@ export class CreateLoanProvisioningCriteriaComponent implements OnInit {
       definitions: this.definitions,
       locale
     };
-    this.organizationService.createProvisioningCriteria(loanProvisioningCriteria).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.organizationService
+      .createProvisioningCriteria(loanProvisioningCriteria)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,10 +7,11 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLinkActive, RouterLink, RouterOutlet } from '@angular/router';
 import { MatTabNav, MatTabLink, MatTabNavPanel } from '@angular/material/tabs';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Office Component
@@ -28,7 +29,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     RouterOutlet
   ]
 })
-export class ViewOfficeComponent {
+export class ViewOfficeComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Office datatables data */
@@ -39,8 +41,13 @@ export class ViewOfficeComponent {
    * @param {ActivatedRoute} route Activated Route
    */
   constructor() {
-    this.route.data.subscribe((data: { officeDatatables: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { officeDatatables: any }) => {
       this.officeDatatables = data.officeDatatables;
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

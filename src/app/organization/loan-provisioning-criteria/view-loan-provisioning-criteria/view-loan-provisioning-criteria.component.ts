@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import {
@@ -34,6 +34,7 @@ import { MatDivider } from '@angular/material/divider';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 
 import { LoanProduct } from 'app/products/loan-products/models/loan-product.model';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Loan Provisioning
@@ -58,7 +59,8 @@ import { LoanProduct } from 'app/products/loan-products/models/loan-product.mode
     MatRow
   ]
 })
-export class ViewLoanProvisioningCriteriaComponent implements OnInit {
+export class ViewLoanProvisioningCriteriaComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private organizationService = inject(OrganizationService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -88,7 +90,7 @@ export class ViewLoanProvisioningCriteriaComponent implements OnInit {
    * @param {MatDialog} dialog Dialog reference.
    */
   constructor() {
-    this.route.data.subscribe((data: { loanProvisioningCriteria: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { loanProvisioningCriteria: any }) => {
       this.provisioningData = data.loanProvisioningCriteria;
     });
   }
@@ -121,17 +123,28 @@ export class ViewLoanProvisioningCriteriaComponent implements OnInit {
     const deleteCriteriaDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `Loan Provisioning Criteria id: ${this.provisioningData.criteriaId}` }
     });
-    deleteCriteriaDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.organizationService.deleteProvisioningCriteria(this.provisioningData.criteriaId).subscribe(
-          () => {
-            this.router.navigate(['/organization/provisioning-criteria']);
-          },
-          (error) => {
-            console.error('Failed to delete provisioning criteria:', error);
-          }
-        );
-      }
-    });
+    deleteCriteriaDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.organizationService
+            .deleteProvisioningCriteria(this.provisioningData.criteriaId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(
+              () => {
+                this.router.navigate(['/organization/provisioning-criteria']);
+              },
+              (error) => {
+                console.error('Failed to delete provisioning criteria:', error);
+              }
+            );
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

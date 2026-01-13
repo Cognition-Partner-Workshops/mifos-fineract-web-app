@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import { MatDialog } from '@angular/material/dialog';
@@ -27,8 +27,8 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 /** rxjs Imports */
-import { switchMap, catchError, finalize } from 'rxjs/operators';
-import { EMPTY } from 'rxjs';
+import { switchMap, catchError, finalize, takeUntil } from 'rxjs/operators';
+import { EMPTY, Subject } from 'rxjs';
 
 /* Custom Services */
 import { PopoverService } from '../../configuration-wizard/popover/popover.service';
@@ -68,7 +68,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class LoanProductsComponent implements OnInit, AfterViewInit {
+export class LoanProductsComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private configurationWizardService = inject(ConfigurationWizardService);
@@ -106,7 +107,7 @@ export class LoanProductsComponent implements OnInit, AfterViewInit {
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { loanProducts: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { loanProducts: any }) => {
       this.loanProductsData = data.loanProducts;
     });
   }
@@ -187,11 +188,14 @@ export class LoanProductsComponent implements OnInit, AfterViewInit {
       width: '50rem'
     });
 
-    importDialogRef.afterClosed().subscribe((response: any) => {
-      if (response && response.file) {
-        this.importLoanProduct(response.file);
-      }
-    });
+    importDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response && response.file) {
+          this.importLoanProduct(response.file);
+        }
+      });
   }
 
   /**
@@ -230,6 +234,7 @@ export class LoanProductsComponent implements OnInit, AfterViewInit {
             switchMap(() => this.productsService.getLoanProducts()),
             catchError((error) => this.errorHandler.handleError(error, 'Loan Product Import'))
           )
+          .pipe(takeUntil(this.destroy$))
           .subscribe({
             next: (data: any) => {
               this.loanProductsData = data;
@@ -248,5 +253,10 @@ export class LoanProductsComponent implements OnInit, AfterViewInit {
     };
 
     reader.readAsText(file);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

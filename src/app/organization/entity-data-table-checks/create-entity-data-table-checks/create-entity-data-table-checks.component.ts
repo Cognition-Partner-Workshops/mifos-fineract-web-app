@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports. */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormBuilder,
   UntypedFormGroup,
@@ -20,6 +20,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 /** Custom Services. */
 import { OrganizationService } from 'app/organization/organization.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Entity Data Table Checks component.
@@ -32,7 +33,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class CreateEntityDataTableChecksComponent implements OnInit {
+export class CreateEntityDataTableChecksComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private organizationService = inject(OrganizationService);
@@ -59,7 +61,7 @@ export class CreateEntityDataTableChecksComponent implements OnInit {
    * @param {Router} router Router.
    */
   constructor() {
-    this.route.data.subscribe((data: { dataTableEntity: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { dataTableEntity: any }) => {
       this.createEntityData = data.dataTableEntity;
       // hardcoded, because data.dataTableEntity.entities might change anytime its order
       this.entityTypes = [
@@ -101,48 +103,59 @@ export class CreateEntityDataTableChecksComponent implements OnInit {
    * @param entity Selected Entity.
    */
   getEntityType() {
-    this.createEntityForm.get('entity').valueChanges.subscribe((option: any) => {
-      switch (option) {
-        case 'm_client': {
-          this.entityType = 'm_client';
-          this.dataTableList = this.createEntityData.datatables.filter((data: any) => data.entity === 'm_client');
-          this.statusList = this.createEntityData.statusClient;
-          this.createEntityForm.removeControl('productId');
-          break;
+    this.createEntityForm
+      .get('entity')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((option: any) => {
+        switch (option) {
+          case 'm_client': {
+            this.entityType = 'm_client';
+            this.dataTableList = this.createEntityData.datatables.filter((data: any) => data.entity === 'm_client');
+            this.statusList = this.createEntityData.statusClient;
+            this.createEntityForm.removeControl('productId');
+            break;
+          }
+          case 'm_loan': {
+            this.entityType = 'm_loan';
+            this.dataTableList = this.createEntityData.datatables.filter((data: any) => data.entity === 'm_loan');
+            this.statusList = this.createEntityData.statusLoans;
+            this.createEntityForm.addControl('productId', new UntypedFormControl('', Validators.required));
+            break;
+          }
+          case 'm_group': {
+            this.entityType = 'm_group';
+            this.dataTableList = this.createEntityData.datatables.filter((data: any) => data.entity === 'm_group');
+            this.statusList = this.createEntityData.statusGroup;
+            this.createEntityForm.removeControl('productId');
+            break;
+          }
+          default: {
+            this.entityType = 'm_savings_account';
+            this.dataTableList = this.createEntityData.datatables.filter(
+              (data: any) => data.entity === 'm_savings_account'
+            );
+            this.statusList = this.createEntityData.statusSavings;
+            this.createEntityForm.addControl('productId', new UntypedFormControl('', Validators.required));
+            break;
+          }
         }
-        case 'm_loan': {
-          this.entityType = 'm_loan';
-          this.dataTableList = this.createEntityData.datatables.filter((data: any) => data.entity === 'm_loan');
-          this.statusList = this.createEntityData.statusLoans;
-          this.createEntityForm.addControl('productId', new UntypedFormControl('', Validators.required));
-          break;
-        }
-        case 'm_group': {
-          this.entityType = 'm_group';
-          this.dataTableList = this.createEntityData.datatables.filter((data: any) => data.entity === 'm_group');
-          this.statusList = this.createEntityData.statusGroup;
-          this.createEntityForm.removeControl('productId');
-          break;
-        }
-        default: {
-          this.entityType = 'm_savings_account';
-          this.dataTableList = this.createEntityData.datatables.filter(
-            (data: any) => data.entity === 'm_savings_account'
-          );
-          this.statusList = this.createEntityData.statusSavings;
-          this.createEntityForm.addControl('productId', new UntypedFormControl('', Validators.required));
-          break;
-        }
-      }
-    });
+      });
   }
 
   /**
    * Submits Entity Datble Form.
    */
   submit() {
-    this.organizationService.createEntityDataTableChecks(this.createEntityForm.value).subscribe((response: any) => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.organizationService
+      .createEntityDataTableChecks(this.createEntityForm.value)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

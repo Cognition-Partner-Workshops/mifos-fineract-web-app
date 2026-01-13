@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -18,6 +18,7 @@ import { AccountingService } from '../../accounting.service';
 import { DeleteDialogComponent } from '../../../shared/delete-dialog/delete-dialog.component';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View closure component.
@@ -31,7 +32,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FaIconComponent
   ]
 })
-export class ViewClosureComponent {
+export class ViewClosureComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -48,7 +50,7 @@ export class ViewClosureComponent {
    * @param {MatDialog} dialog Dialog reference.
    */
   constructor() {
-    this.route.data.subscribe((data: { glAccountClosure: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { glAccountClosure: any }) => {
       this.glAccountClosure = data.glAccountClosure;
     });
   }
@@ -60,12 +62,23 @@ export class ViewClosureComponent {
     const deleteAccountingClosureDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `accounting closure ${this.glAccountClosure.id}` }
     });
-    deleteAccountingClosureDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.accountingService.deleteAccountingClosure(this.glAccountClosure.id).subscribe(() => {
-          this.router.navigate(['/accounting/closing-entries']);
-        });
-      }
-    });
+    deleteAccountingClosureDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.accountingService
+            .deleteAccountingClosure(this.glAccountClosure.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['/accounting/closing-entries']);
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

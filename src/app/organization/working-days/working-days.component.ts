@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -28,6 +28,7 @@ import { ConfigurationWizardService } from '../../configuration-wizard/configura
 import { NextStepDialogComponent } from '../../configuration-wizard/next-step-dialog/next-step-dialog.component';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /** Recurrence default value. */
 const recurrenceDefaultValue = 'FREQ=WEEKLY;INTERVAL=1;BYDAY=';
@@ -44,7 +45,8 @@ const recurrenceDefaultValue = 'FREQ=WEEKLY;INTERVAL=1;BYDAY=';
     MatCheckbox
   ]
 })
-export class WorkingDaysComponent implements OnInit, AfterViewInit {
+export class WorkingDaysComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private organizationService = inject(OrganizationService);
@@ -88,7 +90,7 @@ export class WorkingDaysComponent implements OnInit, AfterViewInit {
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { workingDays: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { workingDays: any }) => {
       this.workingDaysData = data.workingDays;
     });
   }
@@ -152,14 +154,17 @@ export class WorkingDaysComponent implements OnInit, AfterViewInit {
       }
     }
     workingDays.recurrence = recurrence;
-    this.organizationService.updateWorkingDays(workingDays).subscribe((response) => {
-      if (this.configurationWizardService.showDefineWorkingDays === true) {
-        this.configurationWizardService.showDefineWorkingDays = false;
-        this.openNextStepDialog();
-      } else {
-        this.router.navigate(['../'], { relativeTo: this.route });
-      }
-    });
+    this.organizationService
+      .updateWorkingDays(workingDays)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response) => {
+        if (this.configurationWizardService.showDefineWorkingDays === true) {
+          this.configurationWizardService.showDefineWorkingDays = false;
+          this.openNextStepDialog();
+        } else {
+          this.router.navigate(['../'], { relativeTo: this.route });
+        }
+      });
   }
 
   /**
@@ -216,15 +221,23 @@ export class WorkingDaysComponent implements OnInit, AfterViewInit {
         stepPercentage: 30
       }
     });
-    nextStepDialogRef.afterClosed().subscribe((response: { nextStep: boolean }) => {
-      if (response.nextStep) {
-        this.configurationWizardService.showDefineWorkingDays = false;
-        this.configurationWizardService.showDatatables = true;
-        this.router.navigate(['/system']);
-      } else {
-        this.configurationWizardService.showDefineWorkingDays = false;
-        this.router.navigate(['/home']);
-      }
-    });
+    nextStepDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: { nextStep: boolean }) => {
+        if (response.nextStep) {
+          this.configurationWizardService.showDefineWorkingDays = false;
+          this.configurationWizardService.showDatatables = true;
+          this.router.navigate(['/system']);
+        } else {
+          this.configurationWizardService.showDefineWorkingDays = false;
+          this.router.navigate(['/home']);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -17,6 +17,7 @@ import { Dates } from 'app/core/utils/dates';
 import { SettingsService } from 'app/settings/settings.service';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Center Meetings Schedule Component
@@ -30,7 +31,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class EditCenterMeetingScheduleComponent implements OnInit {
+export class EditCenterMeetingScheduleComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private centersService = inject(CentersService);
   private settingsService = inject(SettingsService);
@@ -63,7 +65,7 @@ export class EditCenterMeetingScheduleComponent implements OnInit {
    * @param {Router} router Router
    */
   constructor() {
-    this.route.data.subscribe((data: { centersActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { centersActionData: any }) => {
       this.calendarTemplate = data.centersActionData;
       this.nextMeetingDates = this.calendarTemplate.nextTenRecurringDates;
     });
@@ -114,8 +116,16 @@ export class EditCenterMeetingScheduleComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.centersService.updateCenterMeeting(this.centerId, data, this.calendarId).subscribe((response: any) => {
-      this.router.navigate(['../../'], { relativeTo: this.route });
-    });
+    this.centersService
+      .updateCenterMeeting(this.centerId, data, this.calendarId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

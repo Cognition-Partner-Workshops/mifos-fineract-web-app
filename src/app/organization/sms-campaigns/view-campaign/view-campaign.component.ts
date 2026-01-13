@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import {
@@ -42,6 +42,7 @@ import { MatTabGroup, MatTab } from '@angular/material/tabs';
 import { MatList, MatListItem } from '@angular/material/list';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View SMS Campaign Component
@@ -70,7 +71,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class ViewCampaignComponent implements OnInit {
+export class ViewCampaignComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   dialog = inject(MatDialog);
@@ -137,7 +139,7 @@ export class ViewCampaignComponent implements OnInit {
    * @param {SettingsService} settingsService Setting Service
    */
   constructor() {
-    this.route.data.subscribe((data: { smsCampaign: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { smsCampaign: any }) => {
       this.smsCampaignData = data.smsCampaign;
     });
   }
@@ -191,22 +193,26 @@ export class ViewCampaignComponent implements OnInit {
       formfields: formfields
     };
     const closeCampaignDialogRef = this.dialog.open(FormDialogComponent, { data });
-    closeCampaignDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const locale = this.settingsService.language.code;
-        const dateFormat = this.settingsService.dateFormat;
-        const dataObject = {
-          closureDate: this.dateUtils.formatDate(response.data.value.closureDate, dateFormat),
-          dateFormat,
-          locale
-        };
-        this.organizationService
-          .executeSmsCampaignCommand(this.smsCampaignData.id, dataObject, 'close')
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    closeCampaignDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const locale = this.settingsService.language.code;
+          const dateFormat = this.settingsService.dateFormat;
+          const dataObject = {
+            closureDate: this.dateUtils.formatDate(response.data.value.closureDate, dateFormat),
+            dateFormat,
+            locale
+          };
+          this.organizationService
+            .executeSmsCampaignCommand(this.smsCampaignData.id, dataObject, 'close')
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -228,22 +234,26 @@ export class ViewCampaignComponent implements OnInit {
       formfields: formfields
     };
     const activateCampaignDialogRef = this.dialog.open(FormDialogComponent, { data });
-    activateCampaignDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const locale = this.settingsService.language.code;
-        const dateFormat = this.settingsService.dateFormat;
-        const dataObject = {
-          activationDate: this.dateUtils.formatDate(response.data.value.activationDate, dateFormat),
-          dateFormat,
-          locale
-        };
-        this.organizationService
-          .executeSmsCampaignCommand(this.smsCampaignData.id, dataObject, 'activate')
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    activateCampaignDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const locale = this.settingsService.language.code;
+          const dateFormat = this.settingsService.dateFormat;
+          const dataObject = {
+            activationDate: this.dateUtils.formatDate(response.data.value.activationDate, dateFormat),
+            dateFormat,
+            locale
+          };
+          this.organizationService
+            .executeSmsCampaignCommand(this.smsCampaignData.id, dataObject, 'activate')
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -265,22 +275,26 @@ export class ViewCampaignComponent implements OnInit {
       formfields: formfields
     };
     const reactivateCampaignDialogRef = this.dialog.open(FormDialogComponent, { data });
-    reactivateCampaignDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const locale = this.settingsService.language.code;
-        const dateFormat = this.settingsService.dateFormat;
-        const dataObject = {
-          activationDate: this.dateUtils.formatDate(response.data.value.activationDate, dateFormat),
-          dateFormat,
-          locale
-        };
-        this.organizationService
-          .executeSmsCampaignCommand(this.smsCampaignData.id, dataObject, 'reactivate')
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    reactivateCampaignDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const locale = this.settingsService.language.code;
+          const dateFormat = this.settingsService.dateFormat;
+          const dataObject = {
+            activationDate: this.dateUtils.formatDate(response.data.value.activationDate, dateFormat),
+            dateFormat,
+            locale
+          };
+          this.organizationService
+            .executeSmsCampaignCommand(this.smsCampaignData.id, dataObject, 'reactivate')
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -290,13 +304,19 @@ export class ViewCampaignComponent implements OnInit {
     const deleteSmsCampaignDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `sms campaing with id: ${this.smsCampaignData.id}` }
     });
-    deleteSmsCampaignDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.organizationService.deleteSmsCampaign(this.smsCampaignData.id).subscribe(() => {
-          this.router.navigate(['../'], { relativeTo: this.route });
-        });
-      }
-    });
+    deleteSmsCampaignDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.organizationService
+            .deleteSmsCampaign(this.smsCampaignData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['../'], { relativeTo: this.route });
+            });
+        }
+      });
   }
 
   /**
@@ -332,9 +352,17 @@ export class ViewCampaignComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.organizationService.getMessagebyStatus(data).subscribe((response: any) => {
-      this.dataSource.data = response.pageItems;
-      this.messageTableRef.renderRows();
-    });
+    this.organizationService
+      .getMessagebyStatus(data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.dataSource.data = response.pageItems;
+        this.messageTableRef.renderRows();
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import {
   MatTableDataSource,
@@ -30,6 +30,7 @@ import { ChangePasswordDialogComponent } from 'app/shared/change-password-dialog
 import { SettingsService } from 'app/settings/settings.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Profile Component.
@@ -53,7 +54,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatRow
   ]
 })
-export class ProfileComponent implements OnInit {
+export class ProfileComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private authenticationService = inject(AuthenticationService);
   private settingsService = inject(SettingsService);
   private router = inject(Router);
@@ -96,19 +98,30 @@ export class ProfileComponent implements OnInit {
       width: '400px',
       height: '300px'
     });
-    changeUserPasswordDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.password && response.repeatPassword) {
-        const password = response.password;
-        const repeatPassword = response.repeatPassword;
-        const data = { password: password, repeatPassword: repeatPassword };
-        this.authenticationService.changePassword(this.profileData.userId, data).subscribe(() => {
-          this.router.navigate(['/home']);
-        });
-      }
-    });
+    changeUserPasswordDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.password && response.repeatPassword) {
+          const password = response.password;
+          const repeatPassword = response.repeatPassword;
+          const data = { password: password, repeatPassword: repeatPassword };
+          this.authenticationService
+            .changePassword(this.profileData.userId, data)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['/home']);
+            });
+        }
+      });
   }
 
   get tenantIdentifier(): string {
     return this.settingsService.tenantIdentifier || 'default';
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

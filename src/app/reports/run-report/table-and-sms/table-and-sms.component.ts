@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, Input, ViewChild, OnChanges, inject } from '@angular/core';
+import { Component, Input, ViewChild, OnChanges, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import {
   MatTableDataSource,
@@ -37,6 +37,7 @@ import { ProgressBarService } from 'app/core/progress-bar/progress-bar.service';
 import * as ExcelJS from 'exceljs';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Table and SMS Component
@@ -61,7 +62,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FaIconComponent
   ]
 })
-export class TableAndSmsComponent implements OnChanges {
+export class TableAndSmsComponent implements OnChanges, OnDestroy {
+  private destroy$ = new Subject<void>();
   private reportsService = inject(ReportsService);
   dialog = inject(MatDialog);
   private decimalPipe = inject(DecimalPipe);
@@ -100,6 +102,7 @@ export class TableAndSmsComponent implements OnChanges {
     const exportS3 = this.dataObject.formData.exportS3;
     this.reportsService
       .getRunReportData(this.dataObject.report.name, this.dataObject.formData)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((res: any) => {
         this.toBeExportedToRepo = exportS3;
         if (!this.toBeExportedToRepo) {
@@ -163,11 +166,14 @@ export class TableAndSmsComponent implements OnChanges {
       formfields: formfields
     };
     const exportDialogRef = this.dialog.open(FormDialogComponent, { data });
-    exportDialogRef.afterClosed().subscribe((response: { data: any }) => {
-      if (response.data) {
-        this.downloadCSV(response.data.value.fileName, response.data.value.delimiter);
-      }
-    });
+    exportDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: { data: any }) => {
+        if (response.data) {
+          this.downloadCSV(response.data.value.fileName, response.data.value.delimiter);
+        }
+      });
   }
 
   exportToXLS(): void {
@@ -233,5 +239,10 @@ export class TableAndSmsComponent implements OnChanges {
    */
   isDecimal(index: number) {
     return this.columnTypes[index] === 'DECIMAL';
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

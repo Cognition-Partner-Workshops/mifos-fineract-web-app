@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -33,6 +33,7 @@ import {
 import { MatTooltip } from '@angular/material/tooltip';
 import { FindPipe } from '../../../../pipes/find.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-edit-bucket',
@@ -56,7 +57,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FindPipe
   ]
 })
-export class EditBucketComponent implements OnInit {
+export class EditBucketComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private productsService = inject(ProductsService);
   private router = inject(Router);
@@ -89,21 +91,23 @@ export class EditBucketComponent implements OnInit {
   ];
 
   constructor() {
-    this.route.data.subscribe((data: { delinquencyBucket: any; delinquencyRanges: any }) => {
-      this.delinquencyRangesData = data.delinquencyRanges;
-      this.rangesDataSource = [];
-      this.delinquencyRangesIds = [];
-      this.delinquencyRangesData = this.delinquencyRangesData.sort(
-        (objA: { minimumAgeDays: number }, objB: { minimumAgeDays: number }) =>
-          objA.minimumAgeDays - objB.minimumAgeDays
-      );
-      this.delinquencyBucketData = data.delinquencyBucket;
-      this.delinquencyBucketId = data.delinquencyBucket.id;
-      this.rangesDataSource = this.delinquencyBucketData.ranges;
-      this.rangesDataSource.forEach((item: any) => {
-        this.delinquencyRangesIds.push(item.id);
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { delinquencyBucket: any; delinquencyRanges: any }) => {
+        this.delinquencyRangesData = data.delinquencyRanges;
+        this.rangesDataSource = [];
+        this.delinquencyRangesIds = [];
+        this.delinquencyRangesData = this.delinquencyRangesData.sort(
+          (objA: { minimumAgeDays: number }, objB: { minimumAgeDays: number }) =>
+            objA.minimumAgeDays - objB.minimumAgeDays
+        );
+        this.delinquencyBucketData = data.delinquencyBucket;
+        this.delinquencyBucketId = data.delinquencyBucket.id;
+        this.rangesDataSource = this.delinquencyBucketData.ranges;
+        this.rangesDataSource.forEach((item: any) => {
+          this.delinquencyRangesIds.push(item.id);
+        });
       });
-    });
   }
 
   ngOnInit(): void {
@@ -146,17 +150,20 @@ export class EditBucketComponent implements OnInit {
       formfields: formfields
     };
     const rangeDialogRef = this.dialog.open(FormDialogComponent, { data });
-    rangeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const itemSelected = response.data.value;
-        const item = this.delinquencyRangesData.filter((range: any) => {
-          return range.id === itemSelected.rangeId;
-        });
-        this.rangesDataSource = this.rangesDataSource.concat(item);
-        this.delinquencyRangesIds.push(item.id);
-        this.dataWasChanged = true;
-      }
-    });
+    rangeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const itemSelected = response.data.value;
+          const item = this.delinquencyRangesData.filter((range: any) => {
+            return range.id === itemSelected.rangeId;
+          });
+          this.rangesDataSource = this.rangesDataSource.concat(item);
+          this.delinquencyRangesIds.push(item.id);
+          this.dataWasChanged = true;
+        }
+      });
   }
 
   /**
@@ -166,14 +173,17 @@ export class EditBucketComponent implements OnInit {
     const dialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: this.translateService.instant('labels.text.this') }
     });
-    dialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.delinquencyRangesIds.splice(index, 1);
-        this.rangesDataSource.splice(index, 1);
-        this.rangesDataSource = this.rangesDataSource.concat([]);
-        this.dataWasChanged = true;
-      }
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.delinquencyRangesIds.splice(index, 1);
+          this.rangesDataSource.splice(index, 1);
+          this.rangesDataSource = this.rangesDataSource.concat([]);
+          this.dataWasChanged = true;
+        }
+      });
   }
 
   /**
@@ -191,9 +201,17 @@ export class EditBucketComponent implements OnInit {
         ranges: ranges
       };
 
-      this.productsService.updateDelinquencyBucket(this.delinquencyBucketId, data).subscribe(() => {
-        this.router.navigate(['../'], { relativeTo: this.route });
-      });
+      this.productsService
+        .updateDelinquencyBucket(this.delinquencyBucketId, data)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(() => {
+          this.router.navigate(['../'], { relativeTo: this.route });
+        });
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

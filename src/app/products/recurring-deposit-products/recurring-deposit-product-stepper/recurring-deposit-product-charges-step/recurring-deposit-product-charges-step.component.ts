@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, Input, OnInit, inject } from '@angular/core';
+import { Component, Input, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormControl } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -29,6 +29,7 @@ import {
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { ChargesFilterPipe } from '../../../../pipes/charges-filter.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-recurring-deposit-product-charges-step',
@@ -53,7 +54,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ChargesFilterPipe
   ]
 })
-export class RecurringDepositProductChargesStepComponent implements OnInit {
+export class RecurringDepositProductChargesStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   dialog = inject(MatDialog);
   private translateService = inject(TranslateService);
 
@@ -78,7 +80,7 @@ export class RecurringDepositProductChargesStepComponent implements OnInit {
     } else {
       this.chargesDataSource = [];
     }
-    this.currencyCode.valueChanges.subscribe(() => (this.chargesDataSource = []));
+    this.currencyCode.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => (this.chargesDataSource = []));
   }
 
   addCharge(charge: any) {
@@ -90,17 +92,25 @@ export class RecurringDepositProductChargesStepComponent implements OnInit {
     const deleteChargeDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: this.translateService.instant('labels.inputs.Charge') + ' ' + charge.name }
     });
-    deleteChargeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1);
-        this.chargesDataSource = this.chargesDataSource.concat([]);
-      }
-    });
+    deleteChargeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1);
+          this.chargesDataSource = this.chargesDataSource.concat([]);
+        }
+      });
   }
 
   get recurringDepositProductCharges() {
     return {
       charges: this.chargesDataSource
     };
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

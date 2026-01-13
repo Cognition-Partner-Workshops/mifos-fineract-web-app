@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -37,7 +37,7 @@ import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 /** rxjs Imports */
-import { of } from 'rxjs';
+import { of, Subject, takeUntil } from 'rxjs';
 
 /** Custom Models */
 import { GLAccountNode } from './gl-account-node.model';
@@ -88,7 +88,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatTreeNodeOutlet
   ]
 })
-export class ChartOfAccountsComponent implements AfterViewInit, OnInit {
+export class ChartOfAccountsComponent implements AfterViewInit, OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private glAccountTreeService = inject(GlAccountTreeService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -145,7 +146,7 @@ export class ChartOfAccountsComponent implements AfterViewInit, OnInit {
   constructor() {
     const glAccountTreeService = this.glAccountTreeService;
 
-    this.route.data.subscribe((data: { chartOfAccounts: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { chartOfAccounts: any }) => {
       this.glAccountData = data.chartOfAccounts;
       glAccountTreeService.initialize(this.glAccountData);
     });
@@ -158,11 +159,13 @@ export class ChartOfAccountsComponent implements AfterViewInit, OnInit {
    */
   ngOnInit() {
     this.tableDataSource = new MatTableDataSource(this.glAccountData);
-    this.glAccountTreeService.treeDataChange.subscribe((glAccountTreeData: GLAccountNode[]) => {
-      this.nestedTreeDataSource.data = glAccountTreeData;
-      this.nestedTreeControl.expand(this.nestedTreeDataSource.data[0]);
-      this.nestedTreeControl.dataNodes = glAccountTreeData;
-    });
+    this.glAccountTreeService.treeDataChange
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((glAccountTreeData: GLAccountNode[]) => {
+        this.nestedTreeDataSource.data = glAccountTreeData;
+        this.nestedTreeControl.expand(this.nestedTreeDataSource.data[0]);
+        this.nestedTreeControl.dataNodes = glAccountTreeData;
+      });
   }
 
   /**
@@ -265,5 +268,10 @@ export class ChartOfAccountsComponent implements AfterViewInit, OnInit {
    */
   toggleExpandCollapse() {
     this.isTreeExpanded = this.treeControlService.toggleExpandCollapse(this.nestedTreeControl, this.isTreeExpanded);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

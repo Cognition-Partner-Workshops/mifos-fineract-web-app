@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, Input, inject } from '@angular/core';
+import { Component, Input, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
 /** Custom Models */
@@ -31,6 +31,7 @@ import { MatDivider } from '@angular/material/divider';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Client Address Step Component
@@ -53,7 +54,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatStepperNext
   ]
 })
-export class ClientAddressStepComponent {
+export class ClientAddressStepComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private dialog = inject(MatDialog);
   private translateService = inject(TranslateService);
 
@@ -87,18 +89,21 @@ export class ClientAddressStepComponent {
       formfields: this.getAddressFormFields()
     };
     const addAddressDialogRef = this.dialog.open(FormDialogComponent, { data, width: '50rem' });
-    addAddressDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const addressData = response.data.value;
-        addressData.isActive = false;
-        for (const key in addressData) {
-          if (addressData[key] === '' || addressData[key] === undefined) {
-            delete addressData[key];
+    addAddressDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const addressData = response.data.value;
+          addressData.isActive = false;
+          for (const key in addressData) {
+            if (addressData[key] === '' || addressData[key] === undefined) {
+              delete addressData[key];
+            }
           }
+          this.clientAddressData.push(addressData);
         }
-        this.clientAddressData.push(addressData);
-      }
-    });
+      });
   }
 
   /**
@@ -118,18 +123,21 @@ export class ClientAddressStepComponent {
       layout: { addButtonText: 'Edit' }
     };
     const editAddressDialogRef = this.dialog.open(FormDialogComponent, { data, width: '50rem' });
-    editAddressDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const addressData = response.data.value;
-        addressData.isActive = address.isActive;
-        for (const key in addressData) {
-          if (addressData[key] === '' || addressData[key] === undefined) {
-            delete addressData[key];
+    editAddressDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const addressData = response.data.value;
+          addressData.isActive = address.isActive;
+          for (const key in addressData) {
+            if (addressData[key] === '' || addressData[key] === undefined) {
+              delete addressData[key];
+            }
           }
+          this.clientAddressData[index] = addressData;
         }
-        this.clientAddressData[index] = addressData;
-      }
-    });
+      });
   }
 
   /**
@@ -142,11 +150,14 @@ export class ClientAddressStepComponent {
         deleteContext: `${this.translateService.instant('labels.heading.Address')} ${this.translateService.instant('labels.inputs.Type')} : ${address.addressType} ${index}`
       }
     });
-    deleteAddressDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.clientAddressData.splice(index, 1);
-      }
-    });
+    deleteAddressDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.clientAddressData.splice(index, 1);
+        }
+      });
   }
 
   /**
@@ -319,5 +330,10 @@ export class ClientAddressStepComponent {
    */
   get address() {
     return { address: this.clientAddressData ? this.clientAddressData : [] };
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

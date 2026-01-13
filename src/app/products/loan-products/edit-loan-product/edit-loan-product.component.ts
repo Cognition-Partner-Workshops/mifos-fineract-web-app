@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 /** Custom Components */
@@ -43,6 +43,7 @@ import { StepperButtonsComponent } from '../../../shared/steppers/stepper-button
 import { LoanProductPaymentStrategyStepComponent } from '../loan-product-stepper/loan-product-payment-strategy-step/loan-product-payment-strategy-step.component';
 import { LoanProductPreviewStepComponent } from '../loan-product-stepper/loan-product-preview-step/loan-product-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-edit-loan-product',
@@ -68,7 +69,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     LoanProductPreviewStepComponent
   ]
 })
-export class EditLoanProductComponent implements OnInit {
+export class EditLoanProductComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private productsService = inject(ProductsService);
   private loanProducts = inject(LoanProducts);
@@ -115,16 +117,18 @@ export class EditLoanProductComponent implements OnInit {
   constructor() {
     const loanProducts = this.loanProducts;
 
-    this.route.data.subscribe((data: { loanProductAndTemplate: any; configurations: any }) => {
-      this.loanProductAndTemplate = data.loanProductAndTemplate;
-      const assetAccountData = this.loanProductAndTemplate.accountingMappingOptions.assetAccountOptions || [];
-      const liabilityAccountData = this.loanProductAndTemplate.accountingMappingOptions.liabilityAccountOptions || [];
-      this.loanProductAndTemplate.accountingMappingOptions.assetAndLiabilityAccountOptions =
-        assetAccountData.concat(liabilityAccountData);
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { loanProductAndTemplate: any; configurations: any }) => {
+        this.loanProductAndTemplate = data.loanProductAndTemplate;
+        const assetAccountData = this.loanProductAndTemplate.accountingMappingOptions.assetAccountOptions || [];
+        const liabilityAccountData = this.loanProductAndTemplate.accountingMappingOptions.liabilityAccountOptions || [];
+        this.loanProductAndTemplate.accountingMappingOptions.assetAndLiabilityAccountOptions =
+          assetAccountData.concat(liabilityAccountData);
 
-      this.itemsByDefault = loanProducts.setItemsByDefault(data.configurations);
-      this.loanProductAndTemplate['itemsByDefault'] = this.itemsByDefault;
-    });
+        this.itemsByDefault = loanProducts.setItemsByDefault(data.configurations);
+        this.loanProductAndTemplate['itemsByDefault'] = this.itemsByDefault;
+      });
   }
 
   ngOnInit() {
@@ -353,18 +357,26 @@ export class EditLoanProductComponent implements OnInit {
     }
     delete loanProduct['useDueForRepaymentsConfigurations'];
 
-    this.productsService.updateLoanProduct(this.loanProductAndTemplate.id, loanProduct).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.productsService
+      .updateLoanProduct(this.loanProductAndTemplate.id, loanProduct)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
   }
 
   mapStringEnumOptionToIdList(incomingValues: StringEnumOptionData[]): string[] {
     return incomingValues.map((v) => v.id);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

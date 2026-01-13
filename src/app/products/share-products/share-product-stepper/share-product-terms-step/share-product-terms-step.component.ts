@@ -6,9 +6,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, Input, inject } from '@angular/core';
+import { Component, OnInit, Input, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
-import { combineLatest } from 'rxjs';
+import { combineLatest, Subject, takeUntil } from 'rxjs';
 import { MatFormField, MatLabel, MatError, MatHint } from '@angular/material/form-field';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
@@ -28,7 +28,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatStepperNext
   ]
 })
-export class ShareProductTermsStepComponent implements OnInit {
+export class ShareProductTermsStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
 
   @Input() shareProductsTemplate: any;
@@ -43,14 +44,16 @@ export class ShareProductTermsStepComponent implements OnInit {
     combineLatest([
       this.shareProductTermsForm.get('sharesIssued').valueChanges,
       this.shareProductTermsForm.get('unitPrice').valueChanges
-    ]).subscribe(
-      ([
-        sharesIssued,
-        unitPrice
-      ]: number[]) => {
-        this.shareProductTermsForm.get('shareCapital').setValue(sharesIssued * unitPrice);
-      }
-    );
+    ])
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        ([
+          sharesIssued,
+          unitPrice
+        ]: number[]) => {
+          this.shareProductTermsForm.get('shareCapital').setValue(sharesIssued * unitPrice);
+        }
+      );
 
     if (this.shareProductsTemplate) {
       this.shareProductTermsForm.patchValue({
@@ -91,5 +94,10 @@ export class ShareProductTermsStepComponent implements OnInit {
 
   get shareProductTerms() {
     return this.shareProductTermsForm.value;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

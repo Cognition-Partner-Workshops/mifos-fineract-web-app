@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ClientsService } from 'app/clients/clients.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
@@ -30,6 +30,7 @@ import { StatusLookupPipe } from '../../../../pipes/status-lookup.pipe';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Charge component.
@@ -59,7 +60,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class ViewChargeComponent {
+export class ViewChargeComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private clientService = inject(ClientsService);
@@ -82,7 +84,7 @@ export class ViewChargeComponent {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { clientChargeData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientChargeData: any }) => {
       this.chargeData = data.clientChargeData;
     });
   }
@@ -92,9 +94,12 @@ export class ViewChargeComponent {
    */
   waiveCharge() {
     const waiveChargeObj = { clientId: this.chargeData.clientId, resourceType: this.chargeData.id };
-    this.clientService.waiveClientCharge(waiveChargeObj).subscribe(() => {
-      this.getChargeData();
-    });
+    this.clientService
+      .waiveClientCharge(waiveChargeObj)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.getChargeData();
+      });
   }
 
   /**
@@ -102,30 +107,44 @@ export class ViewChargeComponent {
    */
   undoTransaction(transactionId: any) {
     const transactionData = { clientId: this.chargeData.clientId.toString(), transactionId: transactionId };
-    this.clientService.undoTransaction(transactionData).subscribe(() => {
-      this.getChargeData();
-    });
+    this.clientService
+      .undoTransaction(transactionData)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.getChargeData();
+      });
   }
 
   /**
    * Get Charge Data.
    */
   getChargeData() {
-    this.clientService.getSelectedChargeData(this.chargeData.clientId, this.chargeData.id).subscribe((data: any) => {
-      this.chargeData = data;
-    });
+    this.clientService
+      .getSelectedChargeData(this.chargeData.clientId, this.chargeData.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: any) => {
+        this.chargeData = data;
+      });
   }
 
   /**
    * Delete Charge.
    */
   deleteCharge() {
-    this.clientService.deleteCharge(this.chargeData.clientId, this.chargeData.id).subscribe(() => {
-      this.router.navigate([
-        '../../clients',
-        this.chargeData.clientId,
-        'general'
-      ]);
-    });
+    this.clientService
+      .deleteCharge(this.chargeData.clientId, this.chargeData.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.router.navigate([
+          '../../clients',
+          this.chargeData.clientId,
+          'general'
+        ]);
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

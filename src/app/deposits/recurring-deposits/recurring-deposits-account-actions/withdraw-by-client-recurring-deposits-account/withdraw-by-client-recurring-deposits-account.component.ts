@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Dates } from 'app/core/utils/dates';
@@ -17,6 +17,7 @@ import { RecurringDepositsService } from 'app/deposits/recurring-deposits/recurr
 import { SettingsService } from 'app/settings/settings.service';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 /**
  * Withdrawn by Client Recurring Deposits Account Component
  */
@@ -29,7 +30,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class WithdrawByClientRecurringDepositsAccountComponent implements OnInit {
+export class WithdrawByClientRecurringDepositsAccountComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private recurringDepositsService = inject(RecurringDepositsService);
   private dateUtils = inject(Dates);
@@ -101,8 +103,14 @@ export class WithdrawByClientRecurringDepositsAccountComponent implements OnInit
     };
     this.recurringDepositsService
       .executeRecurringDepositsAccountCommand(this.accountId, 'withdrawnByApplicant', data)
+      .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.router.navigate(['../../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

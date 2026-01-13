@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -25,6 +25,7 @@ import {
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-delinquency-range',
@@ -48,7 +49,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class DelinquencyRangeComponent implements OnInit {
+export class DelinquencyRangeComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   delinquencyRangeData: any;
@@ -67,7 +69,7 @@ export class DelinquencyRangeComponent implements OnInit {
   @ViewChild(MatSort, { static: true }) sort: MatSort;
 
   constructor() {
-    this.route.data.subscribe((data: { delinquencyRanges: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { delinquencyRanges: any }) => {
       this.delinquencyRangeData = data.delinquencyRanges;
     });
   }
@@ -91,5 +93,10 @@ export class DelinquencyRangeComponent implements OnInit {
     this.dataSource = new MatTableDataSource(this.delinquencyRangeData);
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

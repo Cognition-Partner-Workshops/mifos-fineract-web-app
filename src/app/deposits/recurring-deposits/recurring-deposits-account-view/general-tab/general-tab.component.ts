@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Currency } from 'app/shared/models/general.model';
 import { DecimalPipe, CurrencyPipe } from '@angular/common';
@@ -14,6 +14,7 @@ import { ExternalIdentifierComponent } from '../../../../shared/external-identif
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-general-tab',
@@ -28,7 +29,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class GeneralTabComponent {
+export class GeneralTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -38,7 +40,7 @@ export class GeneralTabComponent {
   currency: Currency;
 
   constructor() {
-    this.route.parent.data.subscribe((data: { recurringDepositsAccountData: any }) => {
+    this.route.parent.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountData: any }) => {
       this.recurringDepositsAccountData = data.recurringDepositsAccountData;
       this.currency = this.recurringDepositsAccountData.currency;
       this.isprematureAllowed = data.recurringDepositsAccountData.maturityDate != null;
@@ -50,5 +52,10 @@ export class GeneralTabComponent {
         this.entityType = 'Center';
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

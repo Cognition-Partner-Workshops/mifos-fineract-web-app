@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   MatDialogRef,
   MAT_DIALOG_DATA,
@@ -22,6 +22,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Client Family Members Dialog
@@ -38,7 +39,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatDialogClose
   ]
 })
-export class ClientFamilyMemberDialogComponent implements OnInit {
+export class ClientFamilyMemberDialogComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   dialogRef = inject<MatDialogRef<ClientFamilyMemberDialogComponent>>(MatDialogRef);
   private formBuilder = inject(UntypedFormBuilder);
   private dateUtils = inject(Dates);
@@ -71,14 +73,17 @@ export class ClientFamilyMemberDialogComponent implements OnInit {
     }
 
     // Add subscription to date of birth changes to update age
-    this.familyMemberForm.get('dateOfBirth').valueChanges.subscribe((dateOfBirth: any) => {
-      if (dateOfBirth) {
-        const age = this.calculateAge(dateOfBirth);
-        this.familyMemberForm.get('age').setValue(age);
-      } else {
-        this.familyMemberForm.get('age').setValue('');
-      }
-    });
+    this.familyMemberForm
+      .get('dateOfBirth')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((dateOfBirth: any) => {
+        if (dateOfBirth) {
+          const age = this.calculateAge(dateOfBirth);
+          this.familyMemberForm.get('age').setValue(age);
+        } else {
+          this.familyMemberForm.get('age').setValue('');
+        }
+      });
 
     // If a date of birth is already set, calculate the age
     const currentDob = this.familyMemberForm.get('dateOfBirth').value;
@@ -180,5 +185,10 @@ export class ClientFamilyMemberDialogComponent implements OnInit {
     }
 
     return familyMember;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

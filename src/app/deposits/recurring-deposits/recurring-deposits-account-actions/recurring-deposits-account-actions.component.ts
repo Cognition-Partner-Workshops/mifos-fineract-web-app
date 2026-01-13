@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Currency } from 'app/shared/models/general.model';
 import { ActivateRecurringDepositsAccountComponent } from './activate-recurring-deposits-account/activate-recurring-deposits-account.component';
@@ -19,6 +19,7 @@ import { PrematureCloseRecurringDepositAccountComponent } from './premature-clos
 import { CloseRecurringDepositsAccountComponent } from './close-recurring-deposits-account/close-recurring-deposits-account.component';
 import { DepositRecurringDepositsAccountComponent } from './deposit-recurring-deposits-account/deposit-recurring-deposits-account.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-recurring-deposits-account-actions',
@@ -37,7 +38,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DepositRecurringDepositsAccountComponent
   ]
 })
-export class RecurringDepositsAccountActionsComponent {
+export class RecurringDepositsAccountActionsComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Flag object to store possible actions and render appropriate UI to the user */
@@ -73,7 +75,7 @@ export class RecurringDepositsAccountActionsComponent {
    * @param {ActivatedRoute} route Activated Route
    */
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositsAccountActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountActionData: any }) => {
       if (data.recurringDepositsAccountActionData) {
         this.currency = data.recurringDepositsAccountActionData.currency;
       }
@@ -82,5 +84,10 @@ export class RecurringDepositsAccountActionsComponent {
     if (name && name in this.actions) {
       this.actions[name as keyof typeof this.actions] = true;
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

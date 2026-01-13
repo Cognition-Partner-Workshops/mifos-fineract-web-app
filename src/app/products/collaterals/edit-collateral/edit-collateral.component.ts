@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -15,6 +15,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ProductsService } from 'app/products/products.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-edit-collateral',
@@ -24,7 +25,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class EditCollateralComponent implements OnInit {
+export class EditCollateralComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private productsService = inject(ProductsService);
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
@@ -47,7 +49,7 @@ export class EditCollateralComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service.
    */
   constructor() {
-    this.route.data.subscribe((data: { collateral: any; collateralTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { collateral: any; collateralTemplate: any }) => {
       this.collateralData = data.collateral;
       this.collateralTemplateData = data.collateralTemplate;
     });
@@ -95,8 +97,16 @@ export class EditCollateralComponent implements OnInit {
   submit() {
     const collateral = this.collateralForm.value;
     collateral.locale = this.settingsService.language.code;
-    this.productsService.updateCollateral(this.collateralData.id.toString(), collateral).subscribe((response: any) => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.productsService
+      .updateCollateral(this.collateralData.id.toString(), collateral)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

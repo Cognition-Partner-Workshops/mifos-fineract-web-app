@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -27,7 +27,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
 /** rxjs Imports */
-import { of } from 'rxjs';
+import { of, Subject, takeUntil } from 'rxjs';
 
 /** Custom Services */
 import { PopoverService } from '../../configuration-wizard/popover/popover.service';
@@ -65,7 +65,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class RecurringDepositProductsComponent implements OnInit, AfterViewInit {
+export class RecurringDepositProductsComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private dialog = inject(MatDialog);
@@ -104,7 +105,7 @@ export class RecurringDepositProductsComponent implements OnInit, AfterViewInit 
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositProducts: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositProducts: any }) => {
       this.recurringDepositProductData = data.recurringDepositProducts;
     });
   }
@@ -201,17 +202,25 @@ export class RecurringDepositProductsComponent implements OnInit, AfterViewInit 
         stepPercentage: 94
       }
     });
-    nextStepDialogRef.afterClosed().subscribe((response: { nextStep: boolean }) => {
-      if (response.nextStep) {
-        this.configurationWizardService.showRecurringDepositProductsPage = false;
-        this.configurationWizardService.showRecurringDepositProductsList = false;
-        this.configurationWizardService.showManageFunds = true;
-        this.router.navigate(['/organization']);
-      } else {
-        this.configurationWizardService.showRecurringDepositProductsPage = false;
-        this.configurationWizardService.showRecurringDepositProductsList = false;
-        this.router.navigate(['/home']);
-      }
-    });
+    nextStepDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: { nextStep: boolean }) => {
+        if (response.nextStep) {
+          this.configurationWizardService.showRecurringDepositProductsPage = false;
+          this.configurationWizardService.showRecurringDepositProductsList = false;
+          this.configurationWizardService.showManageFunds = true;
+          this.router.navigate(['/organization']);
+        } else {
+          this.configurationWizardService.showRecurringDepositProductsPage = false;
+          this.configurationWizardService.showRecurringDepositProductsList = false;
+          this.router.navigate(['/home']);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

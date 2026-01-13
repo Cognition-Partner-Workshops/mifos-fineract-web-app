@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -16,6 +16,7 @@ import { OrganizationService } from 'app/organization/organization.service';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Payment Type component.
@@ -30,7 +31,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatCheckbox
   ]
 })
-export class EditPaymentTypeComponent implements OnInit {
+export class EditPaymentTypeComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
   private router = inject(Router);
@@ -49,7 +51,7 @@ export class EditPaymentTypeComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { paymentType: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { paymentType: any }) => {
       this.paymentTypeData = data.paymentType;
     });
   }
@@ -88,8 +90,16 @@ export class EditPaymentTypeComponent implements OnInit {
    */
   submit() {
     const paymentType = this.paymentTypeForm.value;
-    this.organizationService.updatePaymentType(this.paymentTypeData.id, paymentType).subscribe((response) => {
-      this.router.navigate(['../../'], { relativeTo: this.route });
-    });
+    this.organizationService
+      .updatePaymentType(this.paymentTypeData.id, paymentType)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response) => {
+        this.router.navigate(['../../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

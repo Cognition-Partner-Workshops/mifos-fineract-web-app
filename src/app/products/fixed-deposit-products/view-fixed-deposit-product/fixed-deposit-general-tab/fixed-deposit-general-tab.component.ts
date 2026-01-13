@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { trigger, state, transition, animate, style } from '@angular/animations';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
@@ -30,6 +30,7 @@ import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { YesnoPipe } from '../../../../pipes/yesno.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-fixed-deposit-general-tab',
@@ -63,7 +64,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     YesnoPipe
   ]
 })
-export class FixedDepositGeneralTabComponent {
+export class FixedDepositGeneralTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Fixed Deposit Product data. */
@@ -106,9 +108,16 @@ export class FixedDepositGeneralTabComponent {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { fixedDepositProduct: any; fixedDepositProductsTemplate: any }) => {
-      this.fixedDepositProductData = data.fixedDepositProduct;
-      this.fixedDepositProductsTemplate = data.fixedDepositProductsTemplate;
-    });
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { fixedDepositProduct: any; fixedDepositProductsTemplate: any }) => {
+        this.fixedDepositProductData = data.fixedDepositProduct;
+        this.fixedDepositProductsTemplate = data.fixedDepositProductsTemplate;
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

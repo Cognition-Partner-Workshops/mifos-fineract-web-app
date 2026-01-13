@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -32,6 +32,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Cashier Transactions Component.
@@ -60,7 +61,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class TransactionsComponent implements OnInit {
+export class TransactionsComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private organizationService = inject(OrganizationService);
   private route = inject(ActivatedRoute);
 
@@ -97,7 +99,7 @@ export class TransactionsComponent implements OnInit {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { currencies: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { currencies: any }) => {
       this.currencyData = data.currencies.selectedCurrencyOptions;
     });
     this.tellerId = this.route.parent.parent.parent.snapshot.params['id'];
@@ -123,9 +125,10 @@ export class TransactionsComponent implements OnInit {
    * Retrieves the transactions data on changing currency and sets the transactions table.
    */
   onChangeCurrency() {
-    this.currencySelector.valueChanges.subscribe((currencyCode: any) => {
+    this.currencySelector.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((currencyCode: any) => {
       this.organizationService
         .getCashierSummaryAndTransactions(this.tellerId, this.cashierId, currencyCode)
+        .pipe(takeUntil(this.destroy$))
         .subscribe((response: any) => {
           this.cashierData = response;
           this.setTransactions();
@@ -140,5 +143,10 @@ export class TransactionsComponent implements OnInit {
     this.dataSource = new MatTableDataSource(this.cashierData.cashierTransactions.pageItems);
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

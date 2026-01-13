@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, Input, OnInit, inject } from '@angular/core';
+import { Component, Input, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormControl } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -30,6 +30,7 @@ import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { ChargesFilterPipe } from '../../../../pipes/charges-filter.pipe';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-saving-product-charges-step',
@@ -55,7 +56,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class SavingProductChargesStepComponent implements OnInit {
+export class SavingProductChargesStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   dialog = inject(MatDialog);
   private translateService = inject(TranslateService);
 
@@ -81,7 +83,7 @@ export class SavingProductChargesStepComponent implements OnInit {
     this.chargesDataSource = this.savingProductsTemplate.charges || [];
     this.pristine = true;
 
-    this.currencyCode.valueChanges.subscribe(() => (this.chargesDataSource = []));
+    this.currencyCode.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => (this.chargesDataSource = []));
   }
 
   addCharge(charge: any) {
@@ -94,18 +96,26 @@ export class SavingProductChargesStepComponent implements OnInit {
     const deleteChargeDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: this.translateService.instant('labels.inputs.Charge') + ' ' + charge.name }
     });
-    deleteChargeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1);
-        this.chargesDataSource = this.chargesDataSource.concat([]);
-        this.pristine = false;
-      }
-    });
+    deleteChargeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1);
+          this.chargesDataSource = this.chargesDataSource.concat([]);
+          this.pristine = false;
+        }
+      });
   }
 
   get savingProductCharges() {
     return {
       charges: this.chargesDataSource
     };
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

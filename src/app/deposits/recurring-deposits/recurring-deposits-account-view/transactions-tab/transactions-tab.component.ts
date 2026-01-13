@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
@@ -35,6 +35,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Transactions Tab Component.
@@ -67,7 +68,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class TransactionsTabComponent implements OnInit {
+export class TransactionsTabComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -99,7 +101,7 @@ export class TransactionsTabComponent implements OnInit {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.parent.data.subscribe((data: { recurringDepositsAccountData: any }) => {
+    this.route.parent.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountData: any }) => {
       this.transactionsData = data.recurringDepositsAccountData.transactions;
       this.status = data.recurringDepositsAccountData.status.value;
     });
@@ -186,5 +188,10 @@ export class TransactionsTabComponent implements OnInit {
     } else {
       this.router.navigate([transactionsData.id], { relativeTo: this.route });
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

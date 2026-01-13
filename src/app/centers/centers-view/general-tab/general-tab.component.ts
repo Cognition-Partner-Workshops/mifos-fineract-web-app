@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { NgClass } from '@angular/common';
 import {
@@ -27,6 +27,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { StatusLookupPipe } from '../../../pipes/status-lookup.pipe';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Center General Tab Component
@@ -54,7 +55,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class GeneralTabComponent {
+export class GeneralTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Savings Account Table Columns */
@@ -85,12 +87,14 @@ export class GeneralTabComponent {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { centerSummaryData: any; centerViewData: any; savingsAccountData: any }) => {
-      this.centerSummaryData = data.centerSummaryData[0];
-      this.centerViewData = data.centerViewData;
-      this.savingsAccountData = data.savingsAccountData.savingsAccounts;
-      this.groupResourceData = data.centerViewData.groupMembers;
-    });
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { centerSummaryData: any; centerViewData: any; savingsAccountData: any }) => {
+        this.centerSummaryData = data.centerSummaryData[0];
+        this.centerViewData = data.centerViewData;
+        this.savingsAccountData = data.savingsAccountData.savingsAccounts;
+        this.groupResourceData = data.centerViewData.groupMembers;
+      });
   }
 
   /**
@@ -99,5 +103,10 @@ export class GeneralTabComponent {
    */
   routeEdit($event: MouseEvent) {
     $event.stopPropagation();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

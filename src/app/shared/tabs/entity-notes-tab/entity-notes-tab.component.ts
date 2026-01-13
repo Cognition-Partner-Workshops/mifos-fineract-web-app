@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, Input, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, Input, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ClientsService } from 'app/clients/clients.service';
@@ -20,6 +20,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { TranslateService } from '@ngx-translate/core';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-entity-notes-tab',
@@ -32,7 +33,8 @@ import { TranslateService } from '@ngx-translate/core';
     DateFormatPipe
   ]
 })
-export class EntityNotesTabComponent implements OnInit {
+export class EntityNotesTabComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private savingsService = inject(SavingsService);
   private loansService = inject(LoansService);
@@ -89,11 +91,14 @@ export class EntityNotesTabComponent implements OnInit {
         title: this.translateService.instant('labels.heading.Edit Note')
       }
     });
-    editNoteDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data && response.data.value.note !== noteContent) {
-        this.callbackEdit(noteId, response.data.value, index);
-      }
-    });
+    editNoteDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data && response.data.value.note !== noteContent) {
+          this.callbackEdit(noteId, response.data.value, index);
+        }
+      });
   }
 
   deleteNote(noteId: string, index: number) {
@@ -101,10 +106,18 @@ export class EntityNotesTabComponent implements OnInit {
     const deleteNoteDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `${noteLabel}: ${this.entityNotes[index].note}` }
     });
-    deleteNoteDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.callbackDelete(noteId, index);
-      }
-    });
+    deleteNoteDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.callbackDelete(noteId, index);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

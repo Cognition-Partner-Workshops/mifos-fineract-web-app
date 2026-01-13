@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, EventEmitter, Input, OnInit, Output, ViewChild, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, ViewChild, inject, OnDestroy } from '@angular/core';
 import {
   AdvancedCreditAllocation,
   AdvancedPaymentAllocation,
@@ -28,6 +28,7 @@ import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-loan-product-payment-strategy-step',
@@ -45,7 +46,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatTabContent
   ]
 })
-export class LoanProductPaymentStrategyStepComponent implements OnInit {
+export class LoanProductPaymentStrategyStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private dialog = inject(MatDialog);
   private advancedPaymentStrategy = inject(AdvancedPaymentStrategy);
   private translateService = inject(TranslateService);
@@ -121,34 +123,37 @@ export class LoanProductPaymentStrategyStepComponent implements OnInit {
       formfields: formfields
     };
     const transactionTypeDialogRef = this.dialog.open(FormDialogComponent, { data });
-    transactionTypeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const defaultPaymentAllocation: AdvancedPaymentAllocation = this.advancedPaymentAllocations[0];
-        transactionTypesOptions.forEach((transactionType: PaymentAllocationTransactionType) => {
-          if (transactionType.code === response.data.value.code) {
-            if (!transactionType.credit) {
-              this.advancedPaymentAllocations.push(
-                this.advancedPaymentStrategy.buildAdvancedPaymentAllocation(
-                  true,
-                  transactionType,
-                  this.paymentAllocationOrderDefault,
-                  defaultPaymentAllocation.futureInstallmentAllocationRules
-                )
-              );
-            } else {
-              this.advancedCreditAllocations.push(
-                this.advancedPaymentStrategy.buildAdvancedCreditAllocation(
-                  transactionType,
-                  this.creditAllocationOrderDefault
-                )
-              );
+    transactionTypeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const defaultPaymentAllocation: AdvancedPaymentAllocation = this.advancedPaymentAllocations[0];
+          transactionTypesOptions.forEach((transactionType: PaymentAllocationTransactionType) => {
+            if (transactionType.code === response.data.value.code) {
+              if (!transactionType.credit) {
+                this.advancedPaymentAllocations.push(
+                  this.advancedPaymentStrategy.buildAdvancedPaymentAllocation(
+                    true,
+                    transactionType,
+                    this.paymentAllocationOrderDefault,
+                    defaultPaymentAllocation.futureInstallmentAllocationRules
+                  )
+                );
+              } else {
+                this.advancedCreditAllocations.push(
+                  this.advancedPaymentStrategy.buildAdvancedCreditAllocation(
+                    transactionType,
+                    this.creditAllocationOrderDefault
+                  )
+                );
+              }
+              this.paymentAllocationChange.emit(true);
+              this.sendAllocations();
             }
-            this.paymentAllocationChange.emit(true);
-            this.sendAllocations();
-          }
-        });
-      }
-    });
+          });
+        }
+      });
   }
 
   transactionTypeRemoved(transaction: PaymentAllocationTransactionType): void {
@@ -171,5 +176,10 @@ export class LoanProductPaymentStrategyStepComponent implements OnInit {
         }
       });
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

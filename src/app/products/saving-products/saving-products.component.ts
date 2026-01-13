@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -30,6 +30,7 @@ import { PopoverService } from '../../configuration-wizard/popover/popover.servi
 import { ConfigurationWizardService } from '../../configuration-wizard/configuration-wizard.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-saving-products',
@@ -53,7 +54,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class SavingProductsComponent implements OnInit, AfterViewInit {
+export class SavingProductsComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private configurationWizardService = inject(ConfigurationWizardService);
@@ -85,7 +87,7 @@ export class SavingProductsComponent implements OnInit, AfterViewInit {
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { savingProducts: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { savingProducts: any }) => {
       this.savingProductsData = data.savingProducts;
     });
   }
@@ -151,5 +153,10 @@ export class SavingProductsComponent implements OnInit, AfterViewInit {
     this.configurationWizardService.showSavingsProductsList = false;
     this.configurationWizardService.showSavingsProducts = true;
     this.router.navigate(['/products']);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

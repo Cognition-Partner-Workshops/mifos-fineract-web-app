@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports. */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatSort, Sort, MatSortHeader } from '@angular/material/sort';
@@ -35,6 +35,7 @@ import { AccountNumberComponent } from '../shared/account-number/account-number.
 import { ExternalIdentifierComponent } from '../shared/external-identifier/external-identifier.component';
 import { StatusLookupPipe } from '../pipes/status-lookup.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-clients',
@@ -64,7 +65,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     StatusLookupPipe
   ]
 })
-export class ClientsComponent implements OnInit {
+export class ClientsComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private clientService = inject(ClientsService);
 
   @ViewChild('showClosedAccounts') showClosedAccounts: MatCheckbox;
@@ -113,6 +115,7 @@ export class ClientsComponent implements OnInit {
     this.isLoading = true;
     this.clientService
       .searchByText(this.filterText, this.currentPage, this.pageSize, this.sortAttribute, this.sortDirection)
+      .pipe(takeUntil(this.destroy$))
       .subscribe(
         (data: any) => {
           this.dataSource.data = data.content;
@@ -150,5 +153,10 @@ export class ClientsComponent implements OnInit {
   private resetPaginator() {
     this.currentPage = 0;
     this.paginator.firstPage();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

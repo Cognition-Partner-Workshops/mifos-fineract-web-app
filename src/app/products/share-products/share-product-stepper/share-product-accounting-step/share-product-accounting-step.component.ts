@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, Input, inject } from '@angular/core';
+import { Component, OnInit, Input, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -20,6 +20,7 @@ import { GlAccountSelectorComponent } from '../../../../shared/accounting/gl-acc
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-share-product-accounting-step',
@@ -36,7 +37,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatStepperNext
   ]
 })
-export class ShareProductAccountingStepComponent implements OnInit {
+export class ShareProductAccountingStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
 
   @Input() shareProductsTemplate: any;
@@ -84,25 +86,39 @@ export class ShareProductAccountingStepComponent implements OnInit {
   }
 
   setConditionalControls() {
-    this.shareProductAccountingForm.get('accountingRule').valueChanges.subscribe((accountingRule: any) => {
-      if (accountingRule === 2) {
-        this.shareProductAccountingForm.addControl('shareReferenceId', new UntypedFormControl('', Validators.required));
-        this.shareProductAccountingForm.addControl('shareSuspenseId', new UntypedFormControl('', Validators.required));
-        this.shareProductAccountingForm.addControl('shareEquityId', new UntypedFormControl('', Validators.required));
-        this.shareProductAccountingForm.addControl(
-          'incomeFromFeeAccountId',
-          new UntypedFormControl('', Validators.required)
-        );
-      } else {
-        this.shareProductAccountingForm.removeControl('shareReferenceId');
-        this.shareProductAccountingForm.removeControl('shareSuspenseId');
-        this.shareProductAccountingForm.removeControl('shareEquityId');
-        this.shareProductAccountingForm.removeControl('incomeFromFeeAccountId');
-      }
-    });
+    this.shareProductAccountingForm
+      .get('accountingRule')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((accountingRule: any) => {
+        if (accountingRule === 2) {
+          this.shareProductAccountingForm.addControl(
+            'shareReferenceId',
+            new UntypedFormControl('', Validators.required)
+          );
+          this.shareProductAccountingForm.addControl(
+            'shareSuspenseId',
+            new UntypedFormControl('', Validators.required)
+          );
+          this.shareProductAccountingForm.addControl('shareEquityId', new UntypedFormControl('', Validators.required));
+          this.shareProductAccountingForm.addControl(
+            'incomeFromFeeAccountId',
+            new UntypedFormControl('', Validators.required)
+          );
+        } else {
+          this.shareProductAccountingForm.removeControl('shareReferenceId');
+          this.shareProductAccountingForm.removeControl('shareSuspenseId');
+          this.shareProductAccountingForm.removeControl('shareEquityId');
+          this.shareProductAccountingForm.removeControl('incomeFromFeeAccountId');
+        }
+      });
   }
 
   get shareProductAccounting() {
     return this.shareProductAccountingForm.value;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -27,7 +27,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 
 /** rxjs Imports */
-import { of } from 'rxjs';
+import { of, Subject, takeUntil } from 'rxjs';
 
 /** Custom Services */
 import { OrganizationService } from '../organization.service';
@@ -63,7 +63,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class HolidaysComponent implements OnInit, AfterViewInit {
+export class HolidaysComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private organizationService = inject(OrganizationService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -111,7 +112,7 @@ export class HolidaysComponent implements OnInit, AfterViewInit {
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { offices: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { offices: any }) => {
       this.officeData = data.offices;
     });
   }
@@ -135,13 +136,18 @@ export class HolidaysComponent implements OnInit, AfterViewInit {
    * Retrieves the holidays data on changing office and sets the holidays table.
    */
   onChangeOffice() {
-    this.officeSelector.valueChanges.subscribe((officeId = this.officeSelector.value) => {
-      this.holidaysData = [];
-      this.organizationService.getHolidays(officeId).subscribe((holidays: any) => {
-        this.holidaysData = holidays.filter((holiday: any) => holiday.status.value !== 'Deleted');
-        this.setHolidays();
+    this.officeSelector.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((officeId = this.officeSelector.value) => {
+        this.holidaysData = [];
+        this.organizationService
+          .getHolidays(officeId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((holidays: any) => {
+            this.holidaysData = holidays.filter((holiday: any) => holiday.status.value !== 'Deleted');
+            this.setHolidays();
+          });
       });
-    });
   }
 
   /**
@@ -204,5 +210,10 @@ export class HolidaysComponent implements OnInit, AfterViewInit {
     this.configurationWizardService.showHolidayFilter = false;
     this.configurationWizardService.showCreateHoliday = true;
     this.router.navigate(['/organization']);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

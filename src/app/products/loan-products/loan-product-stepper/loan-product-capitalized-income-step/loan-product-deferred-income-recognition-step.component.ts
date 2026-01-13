@@ -6,12 +6,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, EventEmitter, Input, OnInit, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormControl, UntypedFormGroup, Validators } from '@angular/forms';
 import { DeferredIncomeRecognition } from '../loan-product-payment-strategy-step/payment-allocation-model';
 import { StringEnumOptionData } from 'app/shared/models/option-data.model';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-loan-product-capitalized-income-step',
@@ -22,7 +23,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatCheckbox
   ]
 })
-export class LoanProductDeferredIncomeRecognitionStepComponent implements OnInit {
+export class LoanProductDeferredIncomeRecognitionStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
 
   @Input() deferredIncomeRecognition: DeferredIncomeRecognition;
@@ -120,7 +122,8 @@ export class LoanProductDeferredIncomeRecognitionStepComponent implements OnInit
   setConditionalControls() {
     this.loanDeferredIncomeRecognitionForm
       .get('enableIncomeCapitalization')
-      .valueChanges.subscribe((enabled: boolean) => {
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((enabled: boolean) => {
         this.enableIncomeCapitalization = enabled;
         if (this.enableIncomeCapitalization) {
           const capitalizedIncomeCalculationType =
@@ -155,17 +158,20 @@ export class LoanProductDeferredIncomeRecognitionStepComponent implements OnInit
 
           this.loanDeferredIncomeRecognitionForm
             .get('capitalizedIncomeCalculationType')
-            .valueChanges.subscribe((newValue: string) => {
+            .valueChanges.pipe(takeUntil(this.destroy$))
+            .subscribe((newValue: string) => {
               this.emitValuesChange();
             });
           this.loanDeferredIncomeRecognitionForm
             .get('capitalizedIncomeStrategy')
-            .valueChanges.subscribe((newValue: string) => {
+            .valueChanges.pipe(takeUntil(this.destroy$))
+            .subscribe((newValue: string) => {
               this.emitValuesChange();
             });
           this.loanDeferredIncomeRecognitionForm
             .get('capitalizedIncomeType')
-            .valueChanges.subscribe((newValue: string) => {
+            .valueChanges.pipe(takeUntil(this.destroy$))
+            .subscribe((newValue: string) => {
               this.emitValuesChange();
             });
         } else {
@@ -178,69 +184,85 @@ export class LoanProductDeferredIncomeRecognitionStepComponent implements OnInit
         this.setViewChildForm.emit(this.loanDeferredIncomeRecognitionForm);
       });
 
-    this.loanDeferredIncomeRecognitionForm.get('enableBuyDownFee').valueChanges.subscribe((enabled: boolean) => {
-      this.enableBuyDownFee = enabled;
-      if (this.enableBuyDownFee) {
-        const buyDownFeeCalculationType =
-          !this.deferredIncomeRecognition.buyDownFee.buyDownFeeCalculationType ||
-          this.deferredIncomeRecognition.buyDownFee.buyDownFeeCalculationType == ''
-            ? this.buyDownFeeCalculationTypeOptions[0].id
-            : this.deferredIncomeRecognition.buyDownFee.buyDownFeeCalculationType;
-        this.loanDeferredIncomeRecognitionForm.addControl(
-          'buyDownFeeCalculationType',
-          new UntypedFormControl(buyDownFeeCalculationType, Validators.required)
-        );
-        const buyDownFeeStrategy =
-          !this.deferredIncomeRecognition.buyDownFee.buyDownFeeStrategy ||
-          this.deferredIncomeRecognition.buyDownFee.buyDownFeeStrategy == ''
-            ? this.buyDownFeeStrategyOptions[0].id
-            : this.deferredIncomeRecognition.buyDownFee.buyDownFeeStrategy;
-        this.loanDeferredIncomeRecognitionForm.addControl(
-          'buyDownFeeStrategy',
-          new UntypedFormControl(buyDownFeeStrategy, Validators.required)
-        );
-        const buyDownFeeIncomeType =
-          !this.deferredIncomeRecognition.buyDownFee.buyDownFeeIncomeType ||
-          this.deferredIncomeRecognition.buyDownFee.buyDownFeeIncomeType == ''
-            ? this.buyDownFeeIncomeTypeOptions[0].id
-            : this.deferredIncomeRecognition.buyDownFee.buyDownFeeIncomeType;
-        this.loanDeferredIncomeRecognitionForm.addControl(
-          'buyDownFeeIncomeType',
-          new UntypedFormControl(buyDownFeeIncomeType, Validators.required)
-        );
-        this.loanDeferredIncomeRecognitionForm.addControl(
-          'merchantBuyDownFee',
-          new UntypedFormControl(this.deferredIncomeRecognition.buyDownFee.merchantBuyDownFee)
-        );
+    this.loanDeferredIncomeRecognitionForm
+      .get('enableBuyDownFee')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((enabled: boolean) => {
+        this.enableBuyDownFee = enabled;
+        if (this.enableBuyDownFee) {
+          const buyDownFeeCalculationType =
+            !this.deferredIncomeRecognition.buyDownFee.buyDownFeeCalculationType ||
+            this.deferredIncomeRecognition.buyDownFee.buyDownFeeCalculationType == ''
+              ? this.buyDownFeeCalculationTypeOptions[0].id
+              : this.deferredIncomeRecognition.buyDownFee.buyDownFeeCalculationType;
+          this.loanDeferredIncomeRecognitionForm.addControl(
+            'buyDownFeeCalculationType',
+            new UntypedFormControl(buyDownFeeCalculationType, Validators.required)
+          );
+          const buyDownFeeStrategy =
+            !this.deferredIncomeRecognition.buyDownFee.buyDownFeeStrategy ||
+            this.deferredIncomeRecognition.buyDownFee.buyDownFeeStrategy == ''
+              ? this.buyDownFeeStrategyOptions[0].id
+              : this.deferredIncomeRecognition.buyDownFee.buyDownFeeStrategy;
+          this.loanDeferredIncomeRecognitionForm.addControl(
+            'buyDownFeeStrategy',
+            new UntypedFormControl(buyDownFeeStrategy, Validators.required)
+          );
+          const buyDownFeeIncomeType =
+            !this.deferredIncomeRecognition.buyDownFee.buyDownFeeIncomeType ||
+            this.deferredIncomeRecognition.buyDownFee.buyDownFeeIncomeType == ''
+              ? this.buyDownFeeIncomeTypeOptions[0].id
+              : this.deferredIncomeRecognition.buyDownFee.buyDownFeeIncomeType;
+          this.loanDeferredIncomeRecognitionForm.addControl(
+            'buyDownFeeIncomeType',
+            new UntypedFormControl(buyDownFeeIncomeType, Validators.required)
+          );
+          this.loanDeferredIncomeRecognitionForm.addControl(
+            'merchantBuyDownFee',
+            new UntypedFormControl(this.deferredIncomeRecognition.buyDownFee.merchantBuyDownFee)
+          );
 
-        this.loanDeferredIncomeRecognitionForm
-          .get('buyDownFeeCalculationType')
-          .valueChanges.subscribe((newValue: string) => {
-            this.emitValuesChange();
-          });
-        this.loanDeferredIncomeRecognitionForm.get('buyDownFeeStrategy').valueChanges.subscribe((newValue: string) => {
-          this.emitValuesChange();
-        });
-        this.loanDeferredIncomeRecognitionForm
-          .get('buyDownFeeIncomeType')
-          .valueChanges.subscribe((newValue: string) => {
-            this.emitValuesChange();
-          });
-        this.loanDeferredIncomeRecognitionForm.get('merchantBuyDownFee').valueChanges.subscribe((newValue: boolean) => {
-          this.emitValuesChange();
-        });
-      } else {
-        this.loanDeferredIncomeRecognitionForm.removeControl('buyDownFeeCalculationType');
-        this.loanDeferredIncomeRecognitionForm.removeControl('buyDownFeeStrategy');
-        this.loanDeferredIncomeRecognitionForm.removeControl('buyDownFeeIncomeType');
-        this.loanDeferredIncomeRecognitionForm.removeControl('merchantBuyDownFee');
-      }
+          this.loanDeferredIncomeRecognitionForm
+            .get('buyDownFeeCalculationType')
+            .valueChanges.pipe(takeUntil(this.destroy$))
+            .subscribe((newValue: string) => {
+              this.emitValuesChange();
+            });
+          this.loanDeferredIncomeRecognitionForm
+            .get('buyDownFeeStrategy')
+            .valueChanges.pipe(takeUntil(this.destroy$))
+            .subscribe((newValue: string) => {
+              this.emitValuesChange();
+            });
+          this.loanDeferredIncomeRecognitionForm
+            .get('buyDownFeeIncomeType')
+            .valueChanges.pipe(takeUntil(this.destroy$))
+            .subscribe((newValue: string) => {
+              this.emitValuesChange();
+            });
+          this.loanDeferredIncomeRecognitionForm
+            .get('merchantBuyDownFee')
+            .valueChanges.pipe(takeUntil(this.destroy$))
+            .subscribe((newValue: boolean) => {
+              this.emitValuesChange();
+            });
+        } else {
+          this.loanDeferredIncomeRecognitionForm.removeControl('buyDownFeeCalculationType');
+          this.loanDeferredIncomeRecognitionForm.removeControl('buyDownFeeStrategy');
+          this.loanDeferredIncomeRecognitionForm.removeControl('buyDownFeeIncomeType');
+          this.loanDeferredIncomeRecognitionForm.removeControl('merchantBuyDownFee');
+        }
 
-      this.emitValuesChange();
-    });
+        this.emitValuesChange();
+      });
   }
 
   emitValuesChange(): void {
     this.setViewChildForm.emit(this.loanDeferredIncomeRecognitionForm);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

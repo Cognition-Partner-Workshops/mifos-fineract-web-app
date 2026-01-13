@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { UntypedFormBuilder, Validators } from '@angular/forms';
@@ -44,6 +44,7 @@ import { MatSort, MatSortHeader } from '@angular/material/sort';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { ExternalIdentifierComponent } from '../../shared/external-identifier/external-identifier.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Manage Funds component.
@@ -71,7 +72,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class ManageFundsComponent implements OnInit, AfterViewInit {
+export class ManageFundsComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private formBuilder = inject(UntypedFormBuilder);
   private organizationservice = inject(OrganizationService);
@@ -115,7 +117,7 @@ export class ManageFundsComponent implements OnInit, AfterViewInit {
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { funds: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { funds: any }) => {
       this.fundsData = data.funds;
     });
   }
@@ -151,17 +153,20 @@ export class ManageFundsComponent implements OnInit, AfterViewInit {
    */
   addFund() {
     const newFund = this.fundForm.value;
-    this.organizationservice.createFund(newFund).subscribe((response: any) => {
-      this.fundsData.push({
-        id: response.resourceId,
-        name: newFund.name
+    this.organizationservice
+      .createFund(newFund)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.fundsData.push({
+          id: response.resourceId,
+          name: newFund.name
+        });
+        this.formRef.resetForm();
+        if (this.configurationWizardService.showManageFunds === true) {
+          this.configurationWizardService.showManageFunds = false;
+          this.openDialog();
+        }
       });
-      this.formRef.resetForm();
-      if (this.configurationWizardService.showManageFunds === true) {
-        this.configurationWizardService.showManageFunds = false;
-        this.openDialog();
-      }
-    });
   }
 
   /**
@@ -186,13 +191,19 @@ export class ManageFundsComponent implements OnInit, AfterViewInit {
       formfields: formfields
     };
     const editFundDialogRef = this.dialog.open(FormDialogComponent, { data });
-    editFundDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        this.organizationservice.editFund(fundId, response.data.value).subscribe(() => {
-          this.fundsData[index].name = response.data.value.name;
-        });
-      }
-    });
+    editFundDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          this.organizationservice
+            .editFund(fundId, response.data.value)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.fundsData[index].name = response.data.value.name;
+            });
+        }
+      });
   }
 
   /**
@@ -247,20 +258,28 @@ export class ManageFundsComponent implements OnInit, AfterViewInit {
         stepName: 'fund'
       }
     });
-    continueSetupDialogRef.afterClosed().subscribe((response: { step: number }) => {
-      if (response.step === 1) {
-        this.configurationWizardService.showManageFunds = false;
-        this.router.navigate(['../'], { relativeTo: this.route });
-      } else if (response.step === 2) {
-        this.configurationWizardService.showManageFunds = true;
-        this.router.routeReuseStrategy.shouldReuseRoute = () => false;
-        this.router.onSameUrlNavigation = 'reload';
-        this.router.navigate(['/organization/manage-funds']);
-      } else if (response.step === 3) {
-        this.configurationWizardService.showManageFunds = false;
-        this.configurationWizardService.showManageReports = true;
-        this.router.navigate(['/system']);
-      }
-    });
+    continueSetupDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: { step: number }) => {
+        if (response.step === 1) {
+          this.configurationWizardService.showManageFunds = false;
+          this.router.navigate(['../'], { relativeTo: this.route });
+        } else if (response.step === 2) {
+          this.configurationWizardService.showManageFunds = true;
+          this.router.routeReuseStrategy.shouldReuseRoute = () => false;
+          this.router.onSameUrlNavigation = 'reload';
+          this.router.navigate(['/organization/manage-funds']);
+        } else if (response.step === 3) {
+          this.configurationWizardService.showManageFunds = false;
+          this.configurationWizardService.showManageReports = true;
+          this.router.navigate(['/system']);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

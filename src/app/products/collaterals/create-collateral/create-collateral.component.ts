@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { OrganizationService } from 'app/organization/organization.service';
 import { UntypedFormGroup, UntypedFormBuilder, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
@@ -17,6 +17,7 @@ import { ProductsService } from '../../products.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Collateral component.
@@ -29,7 +30,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class CreateCollateralComponent implements OnInit {
+export class CreateCollateralComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private productsService = inject(ProductsService);
   private route = inject(ActivatedRoute);
@@ -51,15 +53,18 @@ export class CreateCollateralComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { collateralTemplate: any }) => {
-      this.organizationService.getCurrencies().subscribe((orgCurrencies: any) => {
-        let orgCurrencyList = Array.isArray(orgCurrencies.selectedCurrencyOptions)
-          ? orgCurrencies.selectedCurrencyOptions
-          : [];
-        this.collateralTemplateData = data.collateralTemplate.filter((currency: any) =>
-          orgCurrencyList.some((orgCurrency: any) => orgCurrency.code === currency.code)
-        );
-      });
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { collateralTemplate: any }) => {
+      this.organizationService
+        .getCurrencies()
+        .pipe(takeUntil(this.destroy$))
+        .subscribe((orgCurrencies: any) => {
+          let orgCurrencyList = Array.isArray(orgCurrencies.selectedCurrencyOptions)
+            ? orgCurrencies.selectedCurrencyOptions
+            : [];
+          this.collateralTemplateData = data.collateralTemplate.filter((currency: any) =>
+            orgCurrencyList.some((orgCurrency: any) => orgCurrency.code === currency.code)
+          );
+        });
     });
   }
 
@@ -112,8 +117,16 @@ export class CreateCollateralComponent implements OnInit {
       ...collateralFormData,
       locale
     };
-    this.productsService.createCollateral(data).subscribe((response: any) => {
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.productsService
+      .createCollateral(data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

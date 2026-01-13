@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LoanProduct } from '../../models/loan-product.model';
 import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-base';
@@ -19,6 +19,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { LoanProductSummaryComponent } from '../../common/loan-product-summary/loan-product-summary.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-general-tab',
@@ -30,7 +31,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     LoanProductSummaryComponent
   ]
 })
-export class GeneralTabComponent implements OnInit {
+export class GeneralTabComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private dialog = inject(MatDialog);
@@ -42,7 +44,7 @@ export class GeneralTabComponent implements OnInit {
   useDueForRepaymentsConfigurations = false;
 
   constructor() {
-    this.route.data.subscribe((data: { loanProduct: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { loanProduct: any }) => {
       this.loanProduct = data.loanProduct;
       this.useDueForRepaymentsConfigurations =
         !this.loanProduct.dueDaysForRepaymentEvent && !this.loanProduct.overDueDaysForRepaymentEvent;
@@ -95,52 +97,63 @@ export class GeneralTabComponent implements OnInit {
       formfields: formfields
     };
     const createProductDialogRef = this.dialog.open(FormDialogComponent, { data });
-    createProductDialogRef.afterClosed().subscribe((productResponse: any) => {
-      if (productResponse.data) {
-        productCopy['name'] = productResponse.data.value['name'];
-        productCopy['shortName'] = productResponse.data.value['shortName'];
-        productCopy['delinquencyBucketId'] = productCopy['delinquencyBucket']
-          ? productCopy['delinquencyBucket']['id']
-          : null;
-        productCopy['currencyCode'] = productCopy['currency'] ? productCopy['currency']['code'] : null;
-        productCopy['interestRatePerPeriod'] = productCopy['annualInterestRate'];
-        productCopy['transactionProcessingStrategyCode'] = productCopy['transactionProcessingStrategyName'];
-        productCopy['allowPartialPeriodInterestCalculation'] = productCopy['allowPartialPeriodInterestCalculation'];
-        productCopy['locale'] = this.settingsService.language.code;
+    createProductDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((productResponse: any) => {
+        if (productResponse.data) {
+          productCopy['name'] = productResponse.data.value['name'];
+          productCopy['shortName'] = productResponse.data.value['shortName'];
+          productCopy['delinquencyBucketId'] = productCopy['delinquencyBucket']
+            ? productCopy['delinquencyBucket']['id']
+            : null;
+          productCopy['currencyCode'] = productCopy['currency'] ? productCopy['currency']['code'] : null;
+          productCopy['interestRatePerPeriod'] = productCopy['annualInterestRate'];
+          productCopy['transactionProcessingStrategyCode'] = productCopy['transactionProcessingStrategyName'];
+          productCopy['allowPartialPeriodInterestCalculation'] = productCopy['allowPartialPeriodInterestCalculation'];
+          productCopy['locale'] = this.settingsService.language.code;
 
-        let valueTmp: any = productCopy['daysInMonthType']['value'];
-        productCopy['daysInMonthType'] = valueTmp;
-        valueTmp = productCopy['daysInYearType']['value'];
-        productCopy['daysInYearType'] = valueTmp;
-        valueTmp = productCopy['amortizationType']['id'];
-        productCopy['amortizationType'] = valueTmp;
+          let valueTmp: any = productCopy['daysInMonthType']['value'];
+          productCopy['daysInMonthType'] = valueTmp;
+          valueTmp = productCopy['daysInYearType']['value'];
+          productCopy['daysInYearType'] = valueTmp;
+          valueTmp = productCopy['amortizationType']['id'];
+          productCopy['amortizationType'] = valueTmp;
 
-        delete productCopy['id'];
-        delete productCopy['advancedPaymentAllocationTransactionTypes'];
-        delete productCopy['advancedPaymentAllocationTypes'];
-        delete productCopy['creditAllocationTransactionTypes'];
-        delete productCopy['creditAllocationAllocationTypes'];
-        delete productCopy['delinquencyBucketOptions'];
-        delete productCopy['allowAttributeConfiguration'];
-        delete productCopy['status'];
-        delete productCopy['delinquencyBucket'];
-        delete productCopy['currency'];
-        delete productCopy['isRatesEnabled'];
-        delete productCopy['annualInterestRate'];
-        delete productCopy['transactionProcessingStrategyName'];
-        delete productCopy['allowPartialPeriodInterestCalculation'];
-        delete productCopy['advancedPaymentAllocationFutureInstallmentAllocationRules'];
+          delete productCopy['id'];
+          delete productCopy['advancedPaymentAllocationTransactionTypes'];
+          delete productCopy['advancedPaymentAllocationTypes'];
+          delete productCopy['creditAllocationTransactionTypes'];
+          delete productCopy['creditAllocationAllocationTypes'];
+          delete productCopy['delinquencyBucketOptions'];
+          delete productCopy['allowAttributeConfiguration'];
+          delete productCopy['status'];
+          delete productCopy['delinquencyBucket'];
+          delete productCopy['currency'];
+          delete productCopy['isRatesEnabled'];
+          delete productCopy['annualInterestRate'];
+          delete productCopy['transactionProcessingStrategyName'];
+          delete productCopy['allowPartialPeriodInterestCalculation'];
+          delete productCopy['advancedPaymentAllocationFutureInstallmentAllocationRules'];
 
-        this.productsService.createLoanProduct(productCopy).subscribe((response: any) => {
-          this.router.navigate(
-            [
-              '../',
-              response.resourceId
-            ],
-            { relativeTo: this.route }
-          );
-        });
-      }
-    });
+          this.productsService
+            .createLoanProduct(productCopy)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe((response: any) => {
+              this.router.navigate(
+                [
+                  '../',
+                  response.resourceId
+                ],
+                { relativeTo: this.route }
+              );
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

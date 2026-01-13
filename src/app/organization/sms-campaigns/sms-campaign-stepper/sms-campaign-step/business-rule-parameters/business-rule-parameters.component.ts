@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnChanges, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
+import { Component, OnChanges, Input, Output, EventEmitter, OnInit, inject, OnDestroy } from '@angular/core';
 import { Validators, UntypedFormGroup, UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 
 /** Custom Services */
@@ -22,6 +22,7 @@ import { MatDivider } from '@angular/material/divider';
 import { NgFor, NgSwitch, NgIf, NgSwitchCase } from '@angular/common';
 import { MatStepperNext } from '@angular/material/stepper';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Business Rule Parameters Component.
@@ -38,7 +39,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatStepperNext
   ]
 })
-export class BusinessRuleParametersComponent implements OnInit, OnChanges {
+export class BusinessRuleParametersComponent implements OnInit, OnChanges, OnDestroy {
+  private destroy$ = new Subject<void>();
   private reportsService = inject(ReportsService);
   private settingsService = inject(SettingsService);
   private dateUtils = inject(Dates);
@@ -125,19 +127,21 @@ export class BusinessRuleParametersComponent implements OnInit, OnChanges {
    */
   setChildControls() {
     this.parentParameters.forEach((param: ReportParameter) => {
-      this.ReportForm.get(param.name).valueChanges.subscribe((option: any) => {
-        param.childParameters.forEach((child: ReportParameter) => {
-          if (child.displayType === 'none') {
-            this.ReportForm.addControl(child.name, new UntypedFormControl(child.defaultVal));
-          } else {
-            this.ReportForm.addControl(child.name, new UntypedFormControl('', Validators.required));
-          }
-          if (child.displayType === 'select') {
-            const inputstring = `${child.name}?${param.inputName}=${option.id}`;
-            this.fetchSelectOptions(child, inputstring);
-          }
+      this.ReportForm.get(param.name)
+        .valueChanges.pipe(takeUntil(this.destroy$))
+        .subscribe((option: any) => {
+          param.childParameters.forEach((child: ReportParameter) => {
+            if (child.displayType === 'none') {
+              this.ReportForm.addControl(child.name, new UntypedFormControl(child.defaultVal));
+            } else {
+              this.ReportForm.addControl(child.name, new UntypedFormControl('', Validators.required));
+            }
+            if (child.displayType === 'select') {
+              const inputstring = `${child.name}?${param.inputName}=${option.id}`;
+              this.fetchSelectOptions(child, inputstring);
+            }
+          });
         });
-      });
     });
   }
 
@@ -147,12 +151,15 @@ export class BusinessRuleParametersComponent implements OnInit, OnChanges {
    * @param {string} inputstring url substring for API call.
    */
   fetchSelectOptions(param: ReportParameter, inputstring: string) {
-    this.reportsService.getSelectOptions(inputstring).subscribe((options: SelectOption[]) => {
-      param.selectOptions = options;
-      if (param.selectAll === 'Y') {
-        param.selectOptions.push({ id: '-1', name: 'All' });
-      }
-    });
+    this.reportsService
+      .getSelectOptions(inputstring)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((options: SelectOption[]) => {
+        param.selectOptions = options;
+        if (param.selectAll === 'Y') {
+          param.selectOptions.push({ id: '-1', name: 'All' });
+        }
+      });
   }
 
   /**
@@ -194,13 +201,21 @@ export class BusinessRuleParametersComponent implements OnInit, OnChanges {
    */
   getResponseHeaders() {
     const formattedresponse = this.formatUserResponse(this.ReportForm.value, true);
-    this.reportsService.getRunReportData(this.reportName, formattedresponse).subscribe(
-      (response: any) => {
-        this.templateParameters.emit(response.columnHeaders);
-      },
-      (error: any) => {
-        this.templateParameters.emit(null);
-      }
-    );
+    this.reportsService
+      .getRunReportData(this.reportName, formattedresponse)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        (response: any) => {
+          this.templateParameters.emit(response.columnHeaders);
+        },
+        (error: any) => {
+          this.templateParameters.emit(null);
+        }
+      );
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

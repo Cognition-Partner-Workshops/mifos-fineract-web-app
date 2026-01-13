@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-base';
@@ -31,6 +31,7 @@ import {
 import { MatDivider } from '@angular/material/divider';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Clients Address Tab Component
@@ -51,7 +52,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatSlideToggle
   ]
 })
-export class AddressTabComponent {
+export class AddressTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private clientService = inject(ClientsService);
   private dialog = inject(MatDialog);
@@ -73,14 +75,14 @@ export class AddressTabComponent {
    * @param {TranslateService} translateService Translate Service.
    */
   constructor() {
-    this.route.data.subscribe(
-      (data: { clientAddressData: any; clientAddressFieldConfig: any; clientAddressTemplateData: any }) => {
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { clientAddressData: any; clientAddressFieldConfig: any; clientAddressTemplateData: any }) => {
         this.clientAddressData = data.clientAddressData;
         this.clientAddressFieldConfig = data.clientAddressFieldConfig;
         this.clientAddressTemplate = data.clientAddressTemplateData;
         this.clientId = this.route.parent.snapshot.paramMap.get('clientId');
-      }
-    );
+      });
   }
 
   /**
@@ -97,19 +99,23 @@ export class AddressTabComponent {
       formfields: this.getAddressFormFields('add')
     };
     const addAddressDialogRef = this.dialog.open(FormDialogComponent, { data });
-    addAddressDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        this.clientService
-          .createClientAddress(this.clientId, response.data.value.addressType, response.data.value)
-          .subscribe((res: any) => {
-            const addressData = response.data.value;
-            addressData.addressId = res.resourceId;
-            addressData.addressType = this.getSelectedValue('addressTypeIdOptions', addressData.addressType).name;
-            addressData.isActive = false;
-            this.clientAddressData.push(addressData);
-          });
-      }
-    });
+    addAddressDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          this.clientService
+            .createClientAddress(this.clientId, response.data.value.addressType, response.data.value)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe((res: any) => {
+              const addressData = response.data.value;
+              addressData.addressId = res.resourceId;
+              addressData.addressType = this.getSelectedValue('addressTypeIdOptions', addressData.addressType).name;
+              addressData.isActive = false;
+              this.clientAddressData.push(addressData);
+            });
+        }
+      });
   }
 
   /**
@@ -129,20 +135,24 @@ export class AddressTabComponent {
       layout: { addButtonText: 'Edit' }
     };
     const editAddressDialogRef = this.dialog.open(FormDialogComponent, { data });
-    editAddressDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const addressData = response.data.value;
-        addressData.addressId = address.addressId;
-        addressData.isActive = address.isActive;
-        this.clientService
-          .editClientAddress(this.clientId, address.addressTypeId, addressData)
-          .subscribe((res: any) => {
-            addressData.addressTypeId = address.addressTypeId;
-            addressData.addressType = address.addressType;
-            this.clientAddressData[index] = addressData;
-          });
-      }
-    });
+    editAddressDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const addressData = response.data.value;
+          addressData.addressId = address.addressId;
+          addressData.isActive = address.isActive;
+          this.clientService
+            .editClientAddress(this.clientId, address.addressTypeId, addressData)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe((res: any) => {
+              addressData.addressTypeId = address.addressTypeId;
+              addressData.addressType = address.addressType;
+              this.clientAddressData[index] = addressData;
+            });
+        }
+      });
   }
 
   /**
@@ -154,9 +164,12 @@ export class AddressTabComponent {
       addressId: address.addressId,
       isActive: address.isActive ? false : true
     };
-    this.clientService.editClientAddress(this.clientId, address.addressTypeId, addressData).subscribe(() => {
-      address.isActive = address.isActive ? false : true;
-    });
+    this.clientService
+      .editClientAddress(this.clientId, address.addressTypeId, addressData)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        address.isActive = address.isActive ? false : true;
+      });
   }
 
   /**
@@ -316,5 +329,10 @@ export class AddressTabComponent {
     );
     formfields = formfields.filter((field) => field !== null);
     return formfields;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

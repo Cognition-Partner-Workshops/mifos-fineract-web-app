@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnChanges, Input, inject } from '@angular/core';
+import { Component, OnChanges, Input, inject, OnDestroy } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 
 /** Custom Services */
@@ -15,6 +15,7 @@ import { ReportsService } from '../../reports.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { ProgressBarService } from 'app/core/progress-bar/progress-bar.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Pentaho Component
@@ -27,7 +28,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class PentahoComponent implements OnChanges {
+export class PentahoComponent implements OnChanges, OnDestroy {
+  private destroy$ = new Subject<void>();
   private sanitizer = inject(DomSanitizer);
   private reportsService = inject(ReportsService);
   private settingsService = inject(SettingsService);
@@ -58,6 +60,7 @@ export class PentahoComponent implements OnChanges {
         this.settingsService.language.code,
         this.settingsService.dateFormat
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe((res: any) => {
         const contentType = res.headers.get('Content-Type');
         const file = new Blob([res.body], { type: contentType });
@@ -66,5 +69,10 @@ export class PentahoComponent implements OnChanges {
         this.hideOutput = false;
         this.progressBarService.decrease();
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

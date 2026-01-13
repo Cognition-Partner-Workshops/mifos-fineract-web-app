@@ -7,11 +7,11 @@
  */
 
 /** Angular Imports */
-import { Component, OnChanges, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
+import { Component, OnChanges, Input, Output, EventEmitter, OnInit, inject, OnDestroy } from '@angular/core';
 import { Validators, UntypedFormGroup, UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 
 /** Rxjs Imports */
-import { distinctUntilChanged } from 'rxjs/operators';
+import { distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
 /** Custom Services */
 import { ReportsService } from 'app/reports/reports.service';
@@ -26,6 +26,7 @@ import { NgFor, NgSwitch, NgIf, NgSwitchCase } from '@angular/common';
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject } from 'rxjs';
 
 /**
  * Edit Business Rule Parameters.
@@ -44,7 +45,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatStepperNext
   ]
 })
-export class EditBusinessRuleParametersComponent implements OnInit, OnChanges {
+export class EditBusinessRuleParametersComponent implements OnInit, OnChanges, OnDestroy {
+  private destroy$ = new Subject<void>();
   private reportsService = inject(ReportsService);
   private settingsService = inject(SettingsService);
   private dateUtils = inject(Dates);
@@ -135,19 +137,21 @@ export class EditBusinessRuleParametersComponent implements OnInit, OnChanges {
    */
   setChildControls() {
     this.parentParameters.forEach((param: ReportParameter) => {
-      this.ReportForm.get(param.name).valueChanges.subscribe((option: any) => {
-        param.childParameters.forEach((child: ReportParameter) => {
-          if (child.displayType === 'none') {
-            this.ReportForm.addControl(child.name, new UntypedFormControl(child.defaultVal));
-          } else {
-            this.ReportForm.addControl(child.name, new UntypedFormControl('', Validators.required));
-          }
-          if (child.displayType === 'select') {
-            const inputstring = `${child.name}?${param.inputName}=${option.id}`;
-            this.fetchSelectOptions(child, inputstring);
-          }
+      this.ReportForm.get(param.name)
+        .valueChanges.pipe(takeUntil(this.destroy$))
+        .subscribe((option: any) => {
+          param.childParameters.forEach((child: ReportParameter) => {
+            if (child.displayType === 'none') {
+              this.ReportForm.addControl(child.name, new UntypedFormControl(child.defaultVal));
+            } else {
+              this.ReportForm.addControl(child.name, new UntypedFormControl('', Validators.required));
+            }
+            if (child.displayType === 'select') {
+              const inputstring = `${child.name}?${param.inputName}=${option.id}`;
+              this.fetchSelectOptions(child, inputstring);
+            }
+          });
         });
-      });
     });
   }
 
@@ -157,15 +161,18 @@ export class EditBusinessRuleParametersComponent implements OnInit, OnChanges {
    * @param {string} inputstring url substring for API call.
    */
   fetchSelectOptions(param: ReportParameter, inputstring: string) {
-    this.reportsService.getSelectOptions(inputstring).subscribe((options: SelectOption[]) => {
-      param.selectOptions = options;
-      if (param.selectAll === 'Y') {
-        param.selectOptions.push({ id: '-1', name: 'All' });
-      }
-      const optionId = this.paramValue[param.variable].toString();
-      const option = options.find((entry) => entry.id === optionId);
-      this.ReportForm.controls[param.name].patchValue({ id: optionId, name: option.name });
-    });
+    this.reportsService
+      .getSelectOptions(inputstring)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((options: SelectOption[]) => {
+        param.selectOptions = options;
+        if (param.selectAll === 'Y') {
+          param.selectOptions.push({ id: '-1', name: 'All' });
+        }
+        const optionId = this.paramValue[param.variable].toString();
+        const option = options.find((entry) => entry.id === optionId);
+        this.ReportForm.controls[param.name].patchValue({ id: optionId, name: option.name });
+      });
   }
 
   /**
@@ -182,11 +189,14 @@ export class EditBusinessRuleParametersComponent implements OnInit, OnChanges {
    * Disable the Report Form once all values are patched.
    */
   disableFormWhenValid() {
-    this.ReportForm.statusChanges.pipe(distinctUntilChanged()).subscribe((status: string) => {
-      if (status === 'VALID') {
-        this.ReportForm.disable();
-      }
-    });
+    this.ReportForm.statusChanges
+      .pipe(distinctUntilChanged())
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((status: string) => {
+        if (status === 'VALID') {
+          this.ReportForm.disable();
+        }
+      });
   }
 
   /**
@@ -216,14 +226,22 @@ export class EditBusinessRuleParametersComponent implements OnInit, OnChanges {
     const reportName = this.paramValue.reportName;
     delete this.paramValue.reportName;
     const formattedResponse = this.formatUserResponse(this.paramValue, true);
-    this.reportsService.getRunReportData(reportName, formattedResponse).subscribe(
-      (response: any) => {
-        this.templateParameters.emit(response.columnHeaders);
-      },
-      (error: any) => {
-        this.templateParameters.emit(null);
-        this.ReportForm.disable();
-      }
-    );
+    this.reportsService
+      .getRunReportData(reportName, formattedResponse)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        (response: any) => {
+          this.templateParameters.emit(response.columnHeaders);
+        },
+        (error: any) => {
+          this.templateParameters.emit(null);
+          this.ReportForm.disable();
+        }
+      );
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -23,6 +23,7 @@ import { Dates } from 'app/core/utils/dates';
 import { SettingsService } from 'app/settings/settings.service';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Center Meetings Component
@@ -36,7 +37,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatCheckbox
   ]
 })
-export class AttachCenterMeetingComponent implements OnInit {
+export class AttachCenterMeetingComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private centersService = inject(CentersService);
   private settingsService = inject(SettingsService);
@@ -71,7 +73,7 @@ export class AttachCenterMeetingComponent implements OnInit {
    * @param {Router} router Router
    */
   constructor() {
-    this.route.data.subscribe((data: { centersActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { centersActionData: any }) => {
       this.calendarTemplate = data.centersActionData;
       this.frequencyOptions = this.calendarTemplate.frequencyOptions;
       this.repeatsOnDays = this.calendarTemplate.repeatsOnDayOptions;
@@ -102,63 +104,69 @@ export class AttachCenterMeetingComponent implements OnInit {
    * Subscribes to value changes of controls.
    */
   buildDependencies() {
-    this.centerMeetingForm.get('repeating').valueChanges.subscribe((value: boolean) => {
-      if (value) {
-        this.centerMeetingForm.addControl('frequency', new UntypedFormControl());
-        this.centerMeetingForm.addControl('interval', new UntypedFormControl());
-        this.centerMeetingForm.get('frequency').valueChanges.subscribe((frequency: any) => {
-          this.centerMeetingForm.removeControl('repeatsOnDay');
-          switch (frequency) {
-            case 1: // Daily
-              this.repetitionIntervals = [
-                '1',
-                '2',
-                '3'
-              ];
-              break;
-            case 2: // Weekly
-              this.repetitionIntervals = [
-                '1',
-                '2',
-                '3'
-              ];
-              this.centerMeetingForm.addControl('repeatsOnDay', new UntypedFormControl('', Validators.required));
-              break;
-            case 3: // Monthly
-              this.repetitionIntervals = [
-                '1',
-                '2',
-                '3',
-                '4',
-                '5',
-                '6',
-                '7',
-                '8',
-                '9',
-                '10',
-                '11'
-              ];
-              break;
-            case 4: // Yearly
-              this.repetitionIntervals = [
-                '1',
-                '2',
-                '3',
-                '4',
-                '5'
-              ];
-              break;
-          }
-        });
-        this.centerMeetingForm.patchValue({
-          frequency: 1,
-          interval: '1'
-        });
-      } else {
-        this.centerMeetingForm.removeControl('frequency');
-        this.centerMeetingForm.removeControl('interval');
-      }
-    });
+    this.centerMeetingForm
+      .get('repeating')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((value: boolean) => {
+        if (value) {
+          this.centerMeetingForm.addControl('frequency', new UntypedFormControl());
+          this.centerMeetingForm.addControl('interval', new UntypedFormControl());
+          this.centerMeetingForm
+            .get('frequency')
+            .valueChanges.pipe(takeUntil(this.destroy$))
+            .subscribe((frequency: any) => {
+              this.centerMeetingForm.removeControl('repeatsOnDay');
+              switch (frequency) {
+                case 1: // Daily
+                  this.repetitionIntervals = [
+                    '1',
+                    '2',
+                    '3'
+                  ];
+                  break;
+                case 2: // Weekly
+                  this.repetitionIntervals = [
+                    '1',
+                    '2',
+                    '3'
+                  ];
+                  this.centerMeetingForm.addControl('repeatsOnDay', new UntypedFormControl('', Validators.required));
+                  break;
+                case 3: // Monthly
+                  this.repetitionIntervals = [
+                    '1',
+                    '2',
+                    '3',
+                    '4',
+                    '5',
+                    '6',
+                    '7',
+                    '8',
+                    '9',
+                    '10',
+                    '11'
+                  ];
+                  break;
+                case 4: // Yearly
+                  this.repetitionIntervals = [
+                    '1',
+                    '2',
+                    '3',
+                    '4',
+                    '5'
+                  ];
+                  break;
+              }
+            });
+          this.centerMeetingForm.patchValue({
+            frequency: 1,
+            interval: '1'
+          });
+        } else {
+          this.centerMeetingForm.removeControl('frequency');
+          this.centerMeetingForm.removeControl('interval');
+        }
+      });
   }
 
   /**
@@ -181,8 +189,16 @@ export class AttachCenterMeetingComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.centersService.createCenterMeeting(this.centerId, data).subscribe((response: any) => {
-      this.router.navigate(['../../general'], { relativeTo: this.route });
-    });
+    this.centersService
+      .createCenterMeeting(this.centerId, data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(['../../general'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

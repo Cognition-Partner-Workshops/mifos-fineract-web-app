@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, Input, OnChanges, inject } from '@angular/core';
+import { Component, OnInit, Input, OnChanges, inject, OnDestroy } from '@angular/core';
 import { UntypedFormControl } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -40,6 +40,7 @@ import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Recurring Deposit Account Charges Step
@@ -68,7 +69,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class RecurringDepositsAccountChargesStepComponent implements OnInit, OnChanges {
+export class RecurringDepositsAccountChargesStepComponent implements OnInit, OnChanges, OnDestroy {
+  private destroy$ = new Subject<void>();
   dialog = inject(MatDialog);
   private dateUtils = inject(Dates);
   private settingsService = inject(SettingsService);
@@ -154,13 +156,16 @@ export class RecurringDepositsAccountChargesStepComponent implements OnInit, OnC
       formfields: formfields
     };
     const editNoteDialogRef = this.dialog.open(FormDialogComponent, { data });
-    editNoteDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const newCharge = { ...charge, amount: response.data.value.amount };
-        this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1, newCharge);
-        this.chargesDataSource = this.chargesDataSource.concat([]);
-      }
-    });
+    editNoteDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const newCharge = { ...charge, amount: response.data.value.amount };
+          this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1, newCharge);
+          this.chargesDataSource = this.chargesDataSource.concat([]);
+        }
+      });
     this.pristine = false;
   }
 
@@ -184,24 +189,27 @@ export class RecurringDepositsAccountChargesStepComponent implements OnInit, OnC
       formfields: formfields
     };
     const editNoteDialogRef = this.dialog.open(FormDialogComponent, { data });
-    editNoteDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        let newCharge: any;
-        const dateFormat = this.settingsService.dateFormat;
-        const date = this.dateUtils.formatDate(response.data.value.date, dateFormat);
-        switch (charge.chargeTimeType.value) {
-          case 'Specified due date':
-          case 'Weekly Fee':
-            newCharge = { ...charge, dueDate: date };
-            break;
-          case 'Annual Fee':
-            newCharge = { ...charge, feeOnMonthDay: date };
-            break;
+    editNoteDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          let newCharge: any;
+          const dateFormat = this.settingsService.dateFormat;
+          const date = this.dateUtils.formatDate(response.data.value.date, dateFormat);
+          switch (charge.chargeTimeType.value) {
+            case 'Specified due date':
+            case 'Weekly Fee':
+              newCharge = { ...charge, dueDate: date };
+              break;
+            case 'Annual Fee':
+              newCharge = { ...charge, feeOnMonthDay: date };
+              break;
+          }
+          this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1, newCharge);
+          this.chargesDataSource = this.chargesDataSource.concat([]);
         }
-        this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1, newCharge);
-        this.chargesDataSource = this.chargesDataSource.concat([]);
-      }
-    });
+      });
     this.pristine = false;
   }
 
@@ -225,13 +233,16 @@ export class RecurringDepositsAccountChargesStepComponent implements OnInit, OnC
       formfields: formfields
     };
     const editNoteDialogRef = this.dialog.open(FormDialogComponent, { data });
-    editNoteDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const newCharge = { ...charge, feeInterval: response.data.value.feeInterval };
-        this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1, newCharge);
-        this.chargesDataSource = this.chargesDataSource.concat([]);
-      }
-    });
+    editNoteDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const newCharge = { ...charge, feeInterval: response.data.value.feeInterval };
+          this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1, newCharge);
+          this.chargesDataSource = this.chargesDataSource.concat([]);
+        }
+      });
     this.pristine = false;
   }
 
@@ -243,13 +254,16 @@ export class RecurringDepositsAccountChargesStepComponent implements OnInit, OnC
     const deleteChargeDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `charge ${charge.name}` }
     });
-    deleteChargeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1);
-        this.chargesDataSource = this.chargesDataSource.concat([]);
-        this.pristine = false;
-      }
-    });
+    deleteChargeDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.chargesDataSource.splice(this.chargesDataSource.indexOf(charge), 1);
+          this.chargesDataSource = this.chargesDataSource.concat([]);
+          this.pristine = false;
+        }
+      });
   }
 
   /**
@@ -259,5 +273,10 @@ export class RecurringDepositsAccountChargesStepComponent implements OnInit, OnC
     return {
       charges: this.chargesDataSource
     };
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

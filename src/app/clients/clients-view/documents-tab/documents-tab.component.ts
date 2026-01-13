@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -14,6 +14,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ClientsService } from '../../clients.service';
 import { EntityDocumentsTabComponent } from '../../../shared/tabs/entity-documents-tab/entity-documents-tab.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-documents-tab',
@@ -24,7 +25,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     EntityDocumentsTabComponent
   ]
 })
-export class DocumentsTabComponent {
+export class DocumentsTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private clientsService = inject(ClientsService);
   dialog = inject(MatDialog);
@@ -34,17 +36,25 @@ export class DocumentsTabComponent {
   entityType = 'clients';
 
   constructor() {
-    this.route.data.subscribe((data: { clientDocuments: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientDocuments: any }) => {
       this.entityDocuments = data.clientDocuments;
     });
     this.entityId = this.route.parent.snapshot.paramMap.get('clientId');
   }
 
   deleteDocument(documentId: string) {
-    this.clientsService.deleteClientDocument(this.entityId, documentId).subscribe((res) => {});
+    this.clientsService
+      .deleteClientDocument(this.entityId, documentId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((res) => {});
   }
 
   uploadDocument(formData: FormData): any {
     return this.clientsService.uploadClientDocument(this.entityId, formData);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

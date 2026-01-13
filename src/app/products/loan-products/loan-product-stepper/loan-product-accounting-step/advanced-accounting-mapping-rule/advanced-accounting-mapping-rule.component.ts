@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, EventEmitter, Input, OnInit, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject, OnDestroy } from '@angular/core';
 import { UntypedFormArray } from '@angular/forms';
 import { MatIconButton } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -31,6 +31,7 @@ import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-
 import { SelectBase } from 'app/shared/form-dialog/formfield/model/select-base';
 import { GLAccount } from 'app/shared/models/general.model';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-advanced-accounting-mapping-rule',
@@ -52,7 +53,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
   templateUrl: './advanced-accounting-mapping-rule.component.html',
   styleUrl: './advanced-accounting-mapping-rule.component.scss'
 })
-export class AdvancedAccountingMappingRuleComponent implements OnInit {
+export class AdvancedAccountingMappingRuleComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   dialog = inject(MatDialog);
   translateService = inject(TranslateService);
 
@@ -101,34 +103,37 @@ export class AdvancedAccountingMappingRuleComponent implements OnInit {
     }
     const data = { ...this.getData(this.formType), pristine: false };
     const dialogRef = this.dialog.open(FormDialogComponent, { data });
-    dialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        if ([
-            'ChargeOffReasonExpense',
-            'WriteOffReasonToExpense'
-          ].includes(this.formType)) {
-          const addData: AccountingMappingDTO = {
-            value: this.getValueData(response.data.value.chargeOffReasonCodeValueId),
-            glAccount: this.getGlAccountData(response.data.value.expenseAccountId)
-          };
-          this.addTableData(addData);
-        } else if ([
-            'BuydownFeeClassificationToIncome',
-            'CapitalizedIncomeClassificationToIncome'
-          ].includes(this.formType)) {
-          const addData: AccountingMappingDTO = {
-            value: this.getValueData(response.data.value.valueId),
-            glAccount: this.getGlAccountData(response.data.value.glAccountId)
-          };
-          this.addTableData(addData);
-        }
-        this.sendParentData();
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          if ([
+              'ChargeOffReasonExpense',
+              'WriteOffReasonToExpense'
+            ].includes(this.formType)) {
+            const addData: AccountingMappingDTO = {
+              value: this.getValueData(response.data.value.chargeOffReasonCodeValueId),
+              glAccount: this.getGlAccountData(response.data.value.expenseAccountId)
+            };
+            this.addTableData(addData);
+          } else if ([
+              'BuydownFeeClassificationToIncome',
+              'CapitalizedIncomeClassificationToIncome'
+            ].includes(this.formType)) {
+            const addData: AccountingMappingDTO = {
+              value: this.getValueData(response.data.value.valueId),
+              glAccount: this.getGlAccountData(response.data.value.glAccountId)
+            };
+            this.addTableData(addData);
+          }
+          this.sendParentData();
 
-        if (this.formType == 'ChargeOffReasonExpense') {
-          this.allowAddAccountingMapping = this.tableData.length < this.accountingMappingOptions.length;
+          if (this.formType == 'ChargeOffReasonExpense') {
+            this.allowAddAccountingMapping = this.tableData.length < this.accountingMappingOptions.length;
+          }
         }
-      }
-    });
+      });
   }
 
   addTableData(addedData: AccountingMappingDTO): void {
@@ -152,57 +157,63 @@ export class AdvancedAccountingMappingRuleComponent implements OnInit {
     const dialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: this.translateService.instant('labels.text.this') }
     });
-    dialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.tableData = this.tableData.filter((_, i) => i !== index);
-        this.sendParentData();
-      }
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.tableData = this.tableData.filter((_, i) => i !== index);
+          this.sendParentData();
+        }
+      });
   }
 
   edit(record: AccountingMappingDTO, index: number) {
     const data = { ...this.getData(this.formType, record), pristine: false, layout: { addButtonText: 'Edit' } };
     const dialogRef = this.dialog.open(FormDialogComponent, { data });
 
-    dialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        let updateData: AccountingMappingDTO;
-        if ([
-            'ChargeOffReasonExpense',
-            'WriteOffReasonToExpense'
-          ].includes(this.formType)) {
-          updateData = {
-            value: this.getValueData(response.data.value.chargeOffReasonCodeValueId),
-            glAccount: this.getGlAccountData(response.data.value.expenseAccountId)
-          };
-        } else if ([
-            'BuydownFeeClassificationToIncome',
-            'CapitalizedIncomeClassificationToIncome'
-          ].includes(this.formType)) {
-          updateData = {
-            value: this.getValueData(response.data.value.valueId),
-            glAccount: this.getGlAccountData(response.data.value.glAccountId)
-          };
-        } else if (this.formType === 'PaymentFundSource') {
-          updateData = {
-            value: this.getValueData(response.data.paymentTypeId),
-            glAccount: this.getGlAccountData(response.data.fundSourceAccountId)
-          };
-        } else if (this.formType === 'FeesIncome') {
-          updateData = {
-            value: this.getValueData(response.data.chargeId),
-            glAccount: this.getGlAccountData(response.data.incomeAccountId)
-          };
-        } else if (this.formType === 'PenaltyIncome') {
-          updateData = {
-            value: this.getValueData(response.data.chargeId),
-            glAccount: this.getGlAccountData(response.data.incomeAccountId)
-          };
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          let updateData: AccountingMappingDTO;
+          if ([
+              'ChargeOffReasonExpense',
+              'WriteOffReasonToExpense'
+            ].includes(this.formType)) {
+            updateData = {
+              value: this.getValueData(response.data.value.chargeOffReasonCodeValueId),
+              glAccount: this.getGlAccountData(response.data.value.expenseAccountId)
+            };
+          } else if ([
+              'BuydownFeeClassificationToIncome',
+              'CapitalizedIncomeClassificationToIncome'
+            ].includes(this.formType)) {
+            updateData = {
+              value: this.getValueData(response.data.value.valueId),
+              glAccount: this.getGlAccountData(response.data.value.glAccountId)
+            };
+          } else if (this.formType === 'PaymentFundSource') {
+            updateData = {
+              value: this.getValueData(response.data.paymentTypeId),
+              glAccount: this.getGlAccountData(response.data.fundSourceAccountId)
+            };
+          } else if (this.formType === 'FeesIncome') {
+            updateData = {
+              value: this.getValueData(response.data.chargeId),
+              glAccount: this.getGlAccountData(response.data.incomeAccountId)
+            };
+          } else if (this.formType === 'PenaltyIncome') {
+            updateData = {
+              value: this.getValueData(response.data.chargeId),
+              glAccount: this.getGlAccountData(response.data.incomeAccountId)
+            };
+          }
+          this.updateTableData(updateData, index);
+          this.sendParentData();
         }
-        this.updateTableData(updateData, index);
-        this.sendParentData();
-      }
-    });
+      });
   }
 
   sendParentData() {
@@ -388,5 +399,10 @@ export class AdvancedAccountingMappingRuleComponent implements OnInit {
       }
     }
     return null;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

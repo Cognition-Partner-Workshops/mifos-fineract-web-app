@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -21,6 +21,7 @@ import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { OrganizationService } from '../../organization.service';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Adhoc Query component.
@@ -34,7 +35,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatCheckbox
   ]
 })
-export class CreateAdhocQueryComponent implements OnInit {
+export class CreateAdhocQueryComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
   private route = inject(ActivatedRoute);
@@ -55,7 +57,7 @@ export class CreateAdhocQueryComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { adhocQueryTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { adhocQueryTemplate: any }) => {
       this.adhocQueryTemplateData = data.adhocQueryTemplate;
     });
   }
@@ -103,19 +105,22 @@ export class CreateAdhocQueryComponent implements OnInit {
    * Sets the conditional controls of the adhoc query form
    */
   setConditionalControls() {
-    this.adhocQueryForm.get('reportRunFrequency').valueChanges.subscribe((reportRunFrequencyId) => {
-      if (reportRunFrequencyId === 5) {
-        this.adhocQueryForm.addControl(
-          'reportRunEvery',
-          new UntypedFormControl('', [
-            Validators.required,
-            Validators.min(1)
-          ])
-        );
-      } else {
-        this.adhocQueryForm.removeControl('reportRunEvery');
-      }
-    });
+    this.adhocQueryForm
+      .get('reportRunFrequency')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((reportRunFrequencyId) => {
+        if (reportRunFrequencyId === 5) {
+          this.adhocQueryForm.addControl(
+            'reportRunEvery',
+            new UntypedFormControl('', [
+              Validators.required,
+              Validators.min(1)
+            ])
+          );
+        } else {
+          this.adhocQueryForm.removeControl('reportRunEvery');
+        }
+      });
   }
 
   /**
@@ -123,14 +128,22 @@ export class CreateAdhocQueryComponent implements OnInit {
    * if successful redirects to view adhoc query.
    */
   submit() {
-    this.organizationService.createAdhocQuery(this.adhocQueryForm.value).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.organizationService
+      .createAdhocQuery(this.adhocQueryForm.value)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

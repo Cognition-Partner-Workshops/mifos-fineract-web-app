@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -29,6 +29,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { YesnoPipe } from '../../../pipes/yesno.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Cashiers component.
@@ -58,7 +59,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     YesnoPipe
   ]
 })
-export class CashiersComponent implements OnInit {
+export class CashiersComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Cashiers data. */
@@ -83,7 +85,7 @@ export class CashiersComponent implements OnInit {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { cashiersData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { cashiersData: any }) => {
       this.cashiersData = data.cashiersData.cashiers;
     });
   }
@@ -118,5 +120,10 @@ export class CashiersComponent implements OnInit {
    */
   routeEdit($event: MouseEvent) {
     $event.stopPropagation();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

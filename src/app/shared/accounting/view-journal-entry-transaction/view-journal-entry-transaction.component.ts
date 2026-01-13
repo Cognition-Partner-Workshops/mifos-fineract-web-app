@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ViewJournalEntryComponent } from '../view-journal-entry/view-journal-entry.component';
 import { RevertTransactionComponent } from 'app/accounting/revert-transaction/revert-transaction.component';
 import { AccountingService } from 'app/accounting/accounting.service';
@@ -34,6 +34,7 @@ import { DatetimeFormatPipe } from '../../../pipes/datetime-format.pipe';
 import { FormatNumberPipe } from '../../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { YesnoPipe } from '@pipes/yesno.pipe';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-view-journal-entry-transaction',
@@ -60,7 +61,8 @@ import { YesnoPipe } from '@pipes/yesno.pipe';
     YesnoPipe
   ]
 })
-export class ViewJournalEntryTransactionComponent implements OnInit {
+export class ViewJournalEntryTransactionComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -98,22 +100,24 @@ export class ViewJournalEntryTransactionComponent implements OnInit {
    * Retrieves the transaction data from `resolve` and sets the transaction table.
    */
   ngOnInit() {
-    this.route.data.subscribe((data: { title: string; transaction: any; transferJournalEntryData: any }) => {
-      this.title = data.title;
-      this.isJournalEntryLoaded = false;
-      if (this.isViewTransaction()) {
-        this.transaction = data.transaction;
-        if (data.transaction.pageItems.length > 0) {
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { title: string; transaction: any; transferJournalEntryData: any }) => {
+        this.title = data.title;
+        this.isJournalEntryLoaded = false;
+        if (this.isViewTransaction()) {
+          this.transaction = data.transaction;
+          if (data.transaction.pageItems.length > 0) {
+            this.isJournalEntryLoaded = true;
+            this.transactionId = data.transaction.pageItems[0].transactionId;
+            this.isManualJournalEntry = data.transaction.pageItems[0].manualEntry;
+          }
+        } else if (this.isViewTransfer()) {
+          this.journalEntriesData = data.transferJournalEntryData.journalEntryData.content;
           this.isJournalEntryLoaded = true;
-          this.transactionId = data.transaction.pageItems[0].transactionId;
-          this.isManualJournalEntry = data.transaction.pageItems[0].manualEntry;
         }
-      } else if (this.isViewTransfer()) {
-        this.journalEntriesData = data.transferJournalEntryData.journalEntryData.content;
-        this.isJournalEntryLoaded = true;
-      }
-      this.setTransaction();
-    });
+        this.setTransaction();
+      });
   }
 
   isViewTransaction(): boolean {
@@ -167,24 +171,28 @@ export class ViewJournalEntryTransactionComponent implements OnInit {
     const revertTransactionDialogRef = this.dialog.open(RevertTransactionComponent, {
       data: { reverted: this.dataSource.data[0].reversed, transactionId: transactionId }
     });
-    revertTransactionDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.revert) {
-        this.accountingService
-          .revertTransaction(this.transactionId, response.comments)
-          .subscribe((reversedTransaction: any) => {
-            this.dataSource.data[0].reversed = true;
-            this.revertTransaction(reversedTransaction.transactionId);
-          });
-      } else if (response.redirect) {
-        this.router.navigate(
-          [
-            '../',
-            transactionId
-          ],
-          { relativeTo: this.route }
-        );
-      }
-    });
+    revertTransactionDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.revert) {
+          this.accountingService
+            .revertTransaction(this.transactionId, response.comments)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe((reversedTransaction: any) => {
+              this.dataSource.data[0].reversed = true;
+              this.revertTransaction(reversedTransaction.transactionId);
+            });
+        } else if (response.redirect) {
+          this.router.navigate(
+            [
+              '../',
+              transactionId
+            ],
+            { relativeTo: this.route }
+          );
+        }
+      });
   }
 
   goBack(): void {
@@ -196,5 +204,10 @@ export class ViewJournalEntryTransactionComponent implements OnInit {
       return 'manual-entry';
     }
     return '';
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

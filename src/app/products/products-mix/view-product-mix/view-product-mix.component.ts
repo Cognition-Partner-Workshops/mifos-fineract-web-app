@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
@@ -33,6 +33,7 @@ import { ProductsService } from 'app/products/products.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { NgClass } from '@angular/common';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View product mix component.
@@ -60,7 +61,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class ViewProductMixComponent implements OnInit {
+export class ViewProductMixComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private dialog = inject(MatDialog);
   private productsService = inject(ProductsService);
@@ -93,7 +95,7 @@ export class ViewProductMixComponent implements OnInit {
    * @param {TranslateService} translateService Translate Service.
    */
   constructor() {
-    this.route.data.subscribe((data: { productMix: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { productMix: any }) => {
       this.productMixData = data.productMix;
     });
   }
@@ -136,12 +138,23 @@ export class ViewProductMixComponent implements OnInit {
           this.productMixData.productId
       }
     });
-    deleteProductMixDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.productsService.deleteProductMix(this.productMixData.productId).subscribe(() => {
-          this.router.navigate(['../'], { relativeTo: this.route });
-        });
-      }
-    });
+    deleteProductMixDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.productsService
+            .deleteProductMix(this.productMixData.productId)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['../'], { relativeTo: this.route });
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

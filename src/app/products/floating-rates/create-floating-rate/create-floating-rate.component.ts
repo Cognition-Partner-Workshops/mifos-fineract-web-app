@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator } from '@angular/material/paginator';
@@ -44,6 +44,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Floating Rate Component.
@@ -77,7 +78,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class CreateFloatingRateComponent implements OnInit {
+export class CreateFloatingRateComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private router = inject(Router);
   private formBuilder = inject(UntypedFormBuilder);
   private productsService = inject(ProductsService);
@@ -168,18 +170,21 @@ export class CreateFloatingRateComponent implements OnInit {
         fromDate: this.settingsService.businessDate
       }
     });
-    floatingRatePeriodDialogRef.afterClosed().subscribe((response: any) => {
-      if (response) {
-        this.floatingRatePeriodsData.push({
-          fromDate: this.dateUtils.formatDate(response.fromDate, this.dateFormat),
-          interestRate: response.interestRate,
-          isDifferentialToBaseLendingRate: response.isDifferentialToBaseLendingRate,
-          locale: this.settingsService.language.code,
-          dateFormat: this.dateFormat
-        });
-        this.dataSource.connect().next(this.floatingRatePeriodsData);
-      }
-    });
+    floatingRatePeriodDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response) {
+          this.floatingRatePeriodsData.push({
+            fromDate: this.dateUtils.formatDate(response.fromDate, this.dateFormat),
+            interestRate: response.interestRate,
+            isDifferentialToBaseLendingRate: response.isDifferentialToBaseLendingRate,
+            locale: this.settingsService.language.code,
+            dateFormat: this.dateFormat
+          });
+          this.dataSource.connect().next(this.floatingRatePeriodsData);
+        }
+      });
   }
 
   /**
@@ -195,18 +200,21 @@ export class CreateFloatingRateComponent implements OnInit {
         isNew: true
       }
     });
-    editFloatingRatePeriodDialogRef.afterClosed().subscribe((response: any) => {
-      if (response) {
-        this.floatingRatePeriodsData[this.floatingRatePeriodsData.indexOf(ratePeriod)] = {
-          fromDate: this.dateUtils.formatDate(response.fromDate, this.dateFormat),
-          interestRate: response.interestRate,
-          isDifferentialToBaseLendingRate: response.isDifferentialToBaseLendingRate,
-          locale: this.settingsService.language.code,
-          dateFormat: this.dateFormat
-        };
-        this.dataSource.connect().next(this.floatingRatePeriodsData);
-      }
-    });
+    editFloatingRatePeriodDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response) {
+          this.floatingRatePeriodsData[this.floatingRatePeriodsData.indexOf(ratePeriod)] = {
+            fromDate: this.dateUtils.formatDate(response.fromDate, this.dateFormat),
+            interestRate: response.interestRate,
+            isDifferentialToBaseLendingRate: response.isDifferentialToBaseLendingRate,
+            locale: this.settingsService.language.code,
+            dateFormat: this.dateFormat
+          };
+          this.dataSource.connect().next(this.floatingRatePeriodsData);
+        }
+      });
   }
 
   /**
@@ -222,12 +230,15 @@ export class CreateFloatingRateComponent implements OnInit {
           ratePeriod.fromDate
       }
     });
-    deleteFloatingRatePeriodRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.floatingRatePeriodsData.splice(this.floatingRatePeriodsData.indexOf(ratePeriod), 1);
-        this.dataSource.connect().next(this.floatingRatePeriodsData);
-      }
-    });
+    deleteFloatingRatePeriodRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.floatingRatePeriodsData.splice(this.floatingRatePeriodsData.indexOf(ratePeriod), 1);
+          this.dataSource.connect().next(this.floatingRatePeriodsData);
+        }
+      });
   }
 
   /**
@@ -236,14 +247,22 @@ export class CreateFloatingRateComponent implements OnInit {
    */
   submit() {
     this.floatingRateForm.value.ratePeriods = this.floatingRatePeriodsData;
-    this.productsService.createFloatingRate(this.floatingRateForm.value).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.productsService
+      .createFloatingRate(this.floatingRateForm.value)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

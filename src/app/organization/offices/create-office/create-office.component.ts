@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ElementRef, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -22,6 +22,7 @@ import { ConfigurationWizardService } from '../../../configuration-wizard/config
 /** Custom Dialog Component */
 import { ContinueSetupDialogComponent } from '../../../configuration-wizard/continue-setup-dialog/continue-setup-dialog.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Office component.
@@ -34,7 +35,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class CreateOfficeComponent implements OnInit, AfterViewInit {
+export class CreateOfficeComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
   private settingsService = inject(SettingsService);
@@ -72,7 +74,7 @@ export class CreateOfficeComponent implements OnInit, AfterViewInit {
    * @param {PopoverService} popoverService PopoverService.
    */
   constructor() {
-    this.route.data.subscribe((data: { offices: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { offices: any }) => {
       this.officeData = data.offices;
     });
   }
@@ -120,14 +122,17 @@ export class CreateOfficeComponent implements OnInit, AfterViewInit {
       dateFormat,
       locale
     };
-    this.organizationService.createOffice(data).subscribe((response) => {
-      if (this.configurationWizardService.showOfficeForm === true) {
-        this.configurationWizardService.showOfficeForm = false;
-        this.openDialog();
-      } else {
-        this.router.navigate(['../'], { relativeTo: this.route });
-      }
-    });
+    this.organizationService
+      .createOffice(data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response) => {
+        if (this.configurationWizardService.showOfficeForm === true) {
+          this.configurationWizardService.showOfficeForm = false;
+          this.openDialog();
+        } else {
+          this.router.navigate(['../'], { relativeTo: this.route });
+        }
+      });
   }
 
   /**
@@ -139,21 +144,24 @@ export class CreateOfficeComponent implements OnInit, AfterViewInit {
         stepName: 'office'
       }
     });
-    continueSetupDialogRef.afterClosed().subscribe((response: { step: number }) => {
-      if (response.step === 1) {
-        this.configurationWizardService.showOfficeForm = false;
-        this.router.navigate(['../'], { relativeTo: this.route });
-      } else if (response.step === 2) {
-        this.configurationWizardService.showOfficeForm = true;
-        this.router.routeReuseStrategy.shouldReuseRoute = () => false;
-        this.router.onSameUrlNavigation = 'reload';
-        this.router.navigate(['/organization/offices/create']);
-      } else if (response.step === 3) {
-        this.configurationWizardService.showOfficeForm = false;
-        this.configurationWizardService.showAddEditCurrency = true;
-        this.router.navigate(['/organization']);
-      }
-    });
+    continueSetupDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: { step: number }) => {
+        if (response.step === 1) {
+          this.configurationWizardService.showOfficeForm = false;
+          this.router.navigate(['../'], { relativeTo: this.route });
+        } else if (response.step === 2) {
+          this.configurationWizardService.showOfficeForm = true;
+          this.router.routeReuseStrategy.shouldReuseRoute = () => false;
+          this.router.onSameUrlNavigation = 'reload';
+          this.router.navigate(['/organization/offices/create']);
+        } else if (response.step === 3) {
+          this.configurationWizardService.showOfficeForm = false;
+          this.configurationWizardService.showAddEditCurrency = true;
+          this.router.navigate(['/organization']);
+        }
+      });
   }
 
   /**
@@ -199,5 +207,10 @@ export class CreateOfficeComponent implements OnInit, AfterViewInit {
     this.configurationWizardService.showOfficeForm = false;
     this.configurationWizardService.showOfficeTable = true;
     this.router.navigate(['/organization/offices']);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

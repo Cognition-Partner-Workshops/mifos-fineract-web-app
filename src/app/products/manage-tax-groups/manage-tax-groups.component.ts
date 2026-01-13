@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -26,7 +26,7 @@ import {
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 /** rxjs Imports */
-import { of } from 'rxjs';
+import { of, Subject, takeUntil } from 'rxjs';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 
@@ -55,7 +55,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class ManageTaxGroupsComponent implements OnInit {
+export class ManageTaxGroupsComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Tax Groups data. */
@@ -75,7 +76,7 @@ export class ManageTaxGroupsComponent implements OnInit {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { taxGroups: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { taxGroups: any }) => {
       this.taxGroupsData = data.taxGroups;
     });
   }
@@ -102,5 +103,10 @@ export class ManageTaxGroupsComponent implements OnInit {
     this.dataSource = new MatTableDataSource(this.taxGroupsData);
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

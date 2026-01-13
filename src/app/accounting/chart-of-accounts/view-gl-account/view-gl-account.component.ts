@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -21,6 +21,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { GlAccountDisplayComponent } from '../../../shared/accounting/gl-account-display/gl-account-display.component';
 import { YesnoPipe } from '../../../pipes/yesno.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View gl account component.
@@ -36,7 +37,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     YesnoPipe
   ]
 })
-export class ViewGlAccountComponent {
+export class ViewGlAccountComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private accountingService = inject(AccountingService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -54,7 +56,7 @@ export class ViewGlAccountComponent {
    * @param {MatDialog} dialog Dialog reference.
    */
   constructor() {
-    this.route.data.subscribe((data: { glAccountAndChartOfAccountsTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { glAccountAndChartOfAccountsTemplate: any }) => {
       this.glAccount = data.glAccountAndChartOfAccountsTemplate;
     });
   }
@@ -66,13 +68,19 @@ export class ViewGlAccountComponent {
     const deleteGlAccountDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `gl account ${this.glAccount.id}` }
     });
-    deleteGlAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.accountingService.deleteGlAccount(this.glAccount.id).subscribe(() => {
-          this.router.navigate(['/accounting/chart-of-accounts']);
-        });
-      }
-    });
+    deleteGlAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.accountingService
+            .deleteGlAccount(this.glAccount.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['/accounting/chart-of-accounts']);
+            });
+        }
+      });
   }
 
   /**
@@ -81,6 +89,7 @@ export class ViewGlAccountComponent {
   changeGlAccountState() {
     this.accountingService
       .updateGlAccount(this.glAccount.id, { disabled: !this.glAccount.disabled })
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: any) => {
         this.glAccount.disabled = response.changes.disabled;
       });
@@ -88,5 +97,10 @@ export class ViewGlAccountComponent {
 
   goBack(): void {
     this.router.navigateByUrl('/accounting/chart-of-accounts');
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
 /** Custom Services. */
@@ -34,6 +34,7 @@ import { DateFormatPipe } from '../../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../../pipes/format-number.pipe';
 import { CurrencyPipe } from '@angular/common';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * General Tab component.
@@ -65,7 +66,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CurrencyPipe
   ]
 })
-export class GeneralTabComponent {
+export class GeneralTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private clientService = inject(ClientsService);
   private router = inject(Router);
@@ -174,18 +176,20 @@ export class GeneralTabComponent {
    * @param {Router} router Router
    */
   constructor() {
-    this.route.data.subscribe(
-      (data: { clientAccountsData: any; clientChargesData: any; clientSummary: any; clientCollateralData: any }) => {
-        this.clientAccountData = data.clientAccountsData;
-        this.savingAccounts = data.clientAccountsData.savingsAccounts;
-        this.loanAccounts = data.clientAccountsData.loanAccounts;
-        this.shareAccounts = data.clientAccountsData.shareAccounts;
-        this.upcomingCharges = data.clientChargesData.pageItems;
-        this.collaterals = data.clientCollateralData;
-        this.clientSummary = data.clientSummary ? data.clientSummary[0] : [];
-        this.clientid = this.route.parent.snapshot.params['clientId'];
-      }
-    );
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        (data: { clientAccountsData: any; clientChargesData: any; clientSummary: any; clientCollateralData: any }) => {
+          this.clientAccountData = data.clientAccountsData;
+          this.savingAccounts = data.clientAccountsData.savingsAccounts;
+          this.loanAccounts = data.clientAccountsData.loanAccounts;
+          this.shareAccounts = data.clientAccountsData.shareAccounts;
+          this.upcomingCharges = data.clientChargesData.pageItems;
+          this.collaterals = data.clientCollateralData;
+          this.clientSummary = data.clientSummary ? data.clientSummary[0] : [];
+          this.clientid = this.route.parent.snapshot.params['clientId'];
+        }
+      );
   }
 
   /**
@@ -230,9 +234,12 @@ export class GeneralTabComponent {
    */
   waiveCharge(chargeId: string, clientId: string) {
     const charge = { clientId: clientId.toString(), resourceType: chargeId };
-    this.clientService.waiveClientCharge(charge).subscribe(() => {
-      this.getChargeData(clientId);
-    });
+    this.clientService
+      .waiveClientCharge(charge)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.getChargeData(clientId);
+      });
   }
 
   /**
@@ -240,9 +247,12 @@ export class GeneralTabComponent {
    * @param clientId Selected Client Id.
    */
   getChargeData(clientId: string) {
-    this.clientService.getClientChargesData(clientId).subscribe((data: any) => {
-      this.upcomingCharges = data.pageItems;
-    });
+    this.clientService
+      .getClientChargesData(clientId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: any) => {
+        this.upcomingCharges = data.pageItems;
+      });
   }
 
   /**
@@ -276,5 +286,10 @@ export class GeneralTabComponent {
     } else {
       return 'labels.buttons.View Closed Accounts';
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

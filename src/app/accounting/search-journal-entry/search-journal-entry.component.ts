@@ -7,15 +7,15 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 /** rxjs Imports */
-import { merge } from 'rxjs';
-import { tap, startWith, map, distinctUntilChanged, debounceTime } from 'rxjs/operators';
+import { merge, Subject } from 'rxjs';
+import { tap, startWith, map, distinctUntilChanged, debounceTime, takeUntil } from 'rxjs/operators';
 
 /** Custom Services */
 import { AccountingService } from '../accounting.service';
@@ -74,7 +74,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class SearchJournalEntryComponent implements OnInit, AfterViewInit {
+export class SearchJournalEntryComponent implements OnInit, AfterViewInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private accountingService = inject(AccountingService);
   private settingsService = inject(SettingsService);
   private dateUtils = inject(Dates);
@@ -199,7 +200,7 @@ export class SearchJournalEntryComponent implements OnInit, AfterViewInit {
    * @param {SettingsService} settingsService Settings Service.
    */
   constructor() {
-    this.route.data.subscribe((data: { offices: any; glAccounts: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { offices: any; glAccounts: any }) => {
       this.officeData = data.offices;
       this.glAccountData = data.glAccounts;
     });
@@ -230,6 +231,7 @@ export class SearchJournalEntryComponent implements OnInit, AfterViewInit {
           this.applyFilter(filterValue, 'officeId');
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
     this.glAccount.valueChanges
@@ -241,6 +243,7 @@ export class SearchJournalEntryComponent implements OnInit, AfterViewInit {
           this.applyFilter(filterValue, 'glAccountId');
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
     this.transactionId.valueChanges
@@ -251,6 +254,7 @@ export class SearchJournalEntryComponent implements OnInit, AfterViewInit {
           this.applyFilter(filterValue, 'transactionId');
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
     this.transactionDateFrom.valueChanges
@@ -261,6 +265,7 @@ export class SearchJournalEntryComponent implements OnInit, AfterViewInit {
           this.applyFilter(this.dateUtils.formatDate(filterValue, this.settingsService.dateFormat), 'fromDate');
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
     this.transactionDateTo.valueChanges
@@ -271,6 +276,7 @@ export class SearchJournalEntryComponent implements OnInit, AfterViewInit {
           this.applyFilter(this.dateUtils.formatDate(filterValue, this.settingsService.dateFormat), 'toDate');
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
     this.submittedOnDateFrom.valueChanges
@@ -284,6 +290,7 @@ export class SearchJournalEntryComponent implements OnInit, AfterViewInit {
           );
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
     this.submittedOnDateTo.valueChanges
@@ -297,12 +304,14 @@ export class SearchJournalEntryComponent implements OnInit, AfterViewInit {
           );
         })
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
 
-    this.sort.sortChange.subscribe(() => (this.paginator.pageIndex = 0));
+    this.sort.sortChange.pipe(takeUntil(this.destroy$)).subscribe(() => (this.paginator.pageIndex = 0));
 
     merge(this.sort.sortChange, this.paginator.page)
       .pipe(tap(() => this.loadJournalEntriesPage()))
+      .pipe(takeUntil(this.destroy$))
       .subscribe();
   }
 
@@ -399,5 +408,10 @@ export class SearchJournalEntryComponent implements OnInit, AfterViewInit {
       this.paginator.pageIndex,
       this.paginator.pageSize
     );
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

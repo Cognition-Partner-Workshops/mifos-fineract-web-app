@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, ViewChild, inject } from '@angular/core';
+import { Component, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 /** Custom Components */
@@ -27,6 +27,7 @@ import { MatStepper, MatStepperIcon, MatStep, MatStepLabel } from '@angular/mate
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { FixedDepositProductPreviewStepComponent } from '../fixed-deposit-product-stepper/fixed-deposit-product-preview-step/fixed-deposit-product-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-edit-fixed-deposit-product',
@@ -49,7 +50,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FixedDepositProductPreviewStepComponent
   ]
 })
-export class EditFixedDepositProductComponent {
+export class EditFixedDepositProductComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private productsService = inject(ProductsService);
   private router = inject(Router);
@@ -82,7 +84,7 @@ export class EditFixedDepositProductComponent {
    */
 
   constructor() {
-    this.route.data.subscribe((data: { fixedDepositProductAndTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { fixedDepositProductAndTemplate: any }) => {
       this.fixedDepositProductsTemplate = data.fixedDepositProductAndTemplate;
     });
     this.accountingRuleData = this.accounting.getAccountingRulesForSavings();
@@ -165,8 +167,14 @@ export class EditFixedDepositProductComponent {
     delete fixedDepositProduct.advancedAccountingRules;
     this.productsService
       .updateFixedDepositProduct(this.fixedDepositProductsTemplate.id, fixedDepositProduct)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: any) => {
         this.router.navigate(['../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

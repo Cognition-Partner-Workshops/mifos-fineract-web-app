@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, Renderer2, ViewChild, ElementRef, SecurityContext, inject } from '@angular/core';
+import { Component, OnInit, Renderer2, ViewChild, ElementRef, SecurityContext, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -16,6 +16,7 @@ import { ClientsService } from 'app/clients/clients.service';
 import { DomSanitizer } from '@angular/platform-browser';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Client Screen Reports Component.
@@ -29,7 +30,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FaIconComponent
   ]
 })
-export class ClientScreenReportsComponent implements OnInit {
+export class ClientScreenReportsComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private clientsService = inject(ClientsService);
   private route = inject(ActivatedRoute);
@@ -57,7 +59,7 @@ export class ClientScreenReportsComponent implements OnInit {
    * @param {Renderer2} renderer Renderer 2
    */
   constructor() {
-    this.route.data.subscribe((data: { clientActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientActionData: any }) => {
       this.templatesData = data.clientActionData;
     });
     this.clientId = this.route.parent.snapshot.params['clientId'];
@@ -97,9 +99,17 @@ export class ClientScreenReportsComponent implements OnInit {
    */
   generate() {
     const templateId = this.clientScreenReportForm.get('templateId').value;
-    this.clientsService.retrieveClientReportTemplate(templateId, this.clientId).subscribe((response: any) => {
-      this.template = this.sanitizer.sanitize(SecurityContext.HTML, response);
-      this.renderer.setProperty(this.screenReportRef.nativeElement, 'innerHTML', this.template);
-    });
+    this.clientsService
+      .retrieveClientReportTemplate(templateId, this.clientId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.template = this.sanitizer.sanitize(SecurityContext.HTML, response);
+        this.renderer.setProperty(this.screenReportRef.nativeElement, 'innerHTML', this.template);
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
 /** Custom Components */
@@ -17,6 +17,7 @@ import { ClientsService } from '../../clients.service';
 import { AuthenticationService } from 'app/core/authentication/authentication.service';
 import { EntityNotesTabComponent } from '../../../shared/tabs/entity-notes-tab/entity-notes-tab.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Notes Tab Component
@@ -30,7 +31,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     EntityNotesTabComponent
   ]
 })
-export class NotesTabComponent implements OnInit {
+export class NotesTabComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private clientsService = inject(ClientsService);
   private authenticationService = inject(AuthenticationService);
@@ -57,7 +59,7 @@ export class NotesTabComponent implements OnInit {
   ngOnInit(): void {
     const credentials = this.authenticationService.getCredentials();
     this.username = credentials.username;
-    this.route.data.subscribe((data: { clientNotes: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientNotes: any }) => {
       this.entityNotes = data.clientNotes;
     });
   }
@@ -69,9 +71,12 @@ export class NotesTabComponent implements OnInit {
    * @param {number} index Index
    */
   editNote(noteId: string, noteContent: any, index: number) {
-    this.clientsService.editClientNote(this.entityId, noteId, noteContent).subscribe(() => {
-      this.entityNotes[index].note = noteContent.note;
-    });
+    this.clientsService
+      .editClientNote(this.entityId, noteId, noteContent)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.entityNotes[index].note = noteContent.note;
+      });
   }
 
   /**
@@ -80,22 +85,33 @@ export class NotesTabComponent implements OnInit {
    * @param {number} index Index
    */
   deleteNote(noteId: string, index: number) {
-    this.clientsService.deleteClientNote(this.entityId, noteId).subscribe(() => {
-      this.entityNotes.splice(index, 1);
-    });
+    this.clientsService
+      .deleteClientNote(this.entityId, noteId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.entityNotes.splice(index, 1);
+      });
   }
 
   /**
    * Creates a client note.
    */
   addNote(noteContent: any) {
-    this.clientsService.createClientNote(this.entityId, noteContent).subscribe((response: any) => {
-      this.entityNotes.push({
-        id: response.resourceId,
-        createdByUsername: this.username,
-        createdOn: new Date(),
-        note: noteContent.note
+    this.clientsService
+      .createClientNote(this.entityId, noteContent)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.entityNotes.push({
+          id: response.resourceId,
+          createdByUsername: this.username,
+          createdOn: new Date(),
+          note: noteContent.note
+        });
       });
-    });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

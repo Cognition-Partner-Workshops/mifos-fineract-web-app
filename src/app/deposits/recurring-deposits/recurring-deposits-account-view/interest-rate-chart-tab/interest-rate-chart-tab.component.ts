@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { animate, state, style, transition, trigger } from '@angular/animations';
 import {
@@ -26,6 +26,7 @@ import { NgIf, NgSwitch, TitleCasePipe } from '@angular/common';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Interest Rate Chart Tab Component.
@@ -59,7 +60,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class InterestRateChartTabComponent {
+export class InterestRateChartTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Interest Rate Chart Data */
@@ -91,8 +93,13 @@ export class InterestRateChartTabComponent {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.parent.data.subscribe((data: { recurringDepositsAccountData: any }) => {
+    this.route.parent.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountData: any }) => {
       this.interestRateChartData = data.recurringDepositsAccountData.accountChart.chartSlabs;
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

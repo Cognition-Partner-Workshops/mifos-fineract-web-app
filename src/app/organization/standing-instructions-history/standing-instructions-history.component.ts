@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
 import {
@@ -34,6 +34,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatTooltip } from '@angular/material/tooltip';
 import { FormatNumberPipe } from '../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Standing Instructions History Component.
@@ -62,7 +63,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class StandingInstructionsHistoryComponent implements OnInit {
+export class StandingInstructionsHistoryComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private organizationService = inject(OrganizationService);
   private settingsService = inject(SettingsService);
@@ -110,7 +112,7 @@ export class StandingInstructionsHistoryComponent implements OnInit {
    * @param {Dates} dateUtils Date Utils to format date.
    */
   constructor() {
-    this.route.data.subscribe((data: { standingInstructionsTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { standingInstructionsTemplate: any }) => {
       this.standingInstructionsTemplate = data.standingInstructionsTemplate;
     });
   }
@@ -139,9 +141,12 @@ export class StandingInstructionsHistoryComponent implements OnInit {
    * Sets conditional child controls.
    */
   buildDependencies() {
-    this.instructionForm.get('fromAccountType').valueChanges.subscribe(() => {
-      this.instructionForm.addControl('fromAccountId', new UntypedFormControl(''));
-    });
+    this.instructionForm
+      .get('fromAccountType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.instructionForm.addControl('fromAccountId', new UntypedFormControl(''));
+      });
   }
 
   /**
@@ -175,8 +180,16 @@ export class StandingInstructionsHistoryComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.organizationService.getStandingInstructions(data).subscribe((response: any) => {
-      this.setInstructions(response.pageItems);
-    });
+    this.organizationService
+      .getStandingInstructions(data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.setInstructions(response.pageItems);
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

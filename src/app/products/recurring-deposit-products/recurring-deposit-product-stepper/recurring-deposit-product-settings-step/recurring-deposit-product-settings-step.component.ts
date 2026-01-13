@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, Input, inject } from '@angular/core';
+import { Component, OnInit, Input, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -20,6 +20,7 @@ import { MatDivider } from '@angular/material/divider';
 import { MatStepperPrevious, MatStepperNext } from '@angular/material/stepper';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-recurring-deposit-product-settings-step',
@@ -35,7 +36,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatStepperNext
   ]
 })
-export class RecurringDepositProductSettingsStepComponent implements OnInit {
+export class RecurringDepositProductSettingsStepComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
 
   @Input() recurringDepositProductsTemplate: any;
@@ -124,16 +126,19 @@ export class RecurringDepositProductSettingsStepComponent implements OnInit {
   }
 
   setConditionalControls() {
-    this.recurringDepositProductSettingsForm.get('withHoldTax').valueChanges.subscribe((withHoldTax: any) => {
-      if (withHoldTax) {
-        this.recurringDepositProductSettingsForm.addControl(
-          'taxGroupId',
-          new UntypedFormControl('', Validators.required)
-        );
-      } else {
-        this.recurringDepositProductSettingsForm.removeControl('taxGroupId');
-      }
-    });
+    this.recurringDepositProductSettingsForm
+      .get('withHoldTax')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((withHoldTax: any) => {
+        if (withHoldTax) {
+          this.recurringDepositProductSettingsForm.addControl(
+            'taxGroupId',
+            new UntypedFormControl('', Validators.required)
+          );
+        } else {
+          this.recurringDepositProductSettingsForm.removeControl('taxGroupId');
+        }
+      });
   }
 
   get recurringDepositProductSettings() {
@@ -144,5 +149,10 @@ export class RecurringDepositProductSettingsStepComponent implements OnInit {
       }
     }
     return recurringDepositProductSettings;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

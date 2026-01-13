@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLinkActive, RouterLink, RouterOutlet } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -42,6 +42,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { MatTabNav, MatTabLink, MatTabNavPanel } from '@angular/material/tabs';
 import { StatusLookupPipe } from '../../../pipes/status-lookup.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Fixed Deposits Account View Component
@@ -74,7 +75,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     StatusLookupPipe
   ]
 })
-export class FixedDepositAccountViewComponent implements OnInit {
+export class FixedDepositAccountViewComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private fixedDepositsService = inject(FixedDepositsService);
@@ -101,13 +103,15 @@ export class FixedDepositAccountViewComponent implements OnInit {
    * @param {MatDialog} dialog Mat Dialog
    */
   constructor() {
-    this.route.data.subscribe((data: { fixedDepositsAccountData: any; savingsDatatables: any }) => {
-      this.fixedDepositsAccountData = data.fixedDepositsAccountData;
-      this.savingsDatatables = data.savingsDatatables;
-      this.currency = this.fixedDepositsAccountData.currency;
-      const status: any = data.fixedDepositsAccountData.status;
-      this.showTransactions = status.id >= 300;
-    });
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { fixedDepositsAccountData: any; savingsDatatables: any }) => {
+        this.fixedDepositsAccountData = data.fixedDepositsAccountData;
+        this.savingsDatatables = data.savingsDatatables;
+        this.currency = this.fixedDepositsAccountData.currency;
+        const status: any = data.fixedDepositsAccountData.status;
+        this.showTransactions = status.id >= 300;
+      });
     if (this.router.url.includes('clients')) {
       this.entityType = 'Client';
     } else if (this.router.url.includes('groups')) {
@@ -197,13 +201,19 @@ export class FixedDepositAccountViewComponent implements OnInit {
     const deleteFixedDepositsAccountDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: `fixed deposit account with id: ${this.fixedDepositsAccountData.id}` }
     });
-    deleteFixedDepositsAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.fixedDepositsService.deleteFixedDepositsAccount(this.fixedDepositsAccountData.id).subscribe(() => {
-          this.router.navigate(['../../'], { relativeTo: this.route });
-        });
-      }
-    });
+    deleteFixedDepositsAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.fixedDepositsService
+            .deleteFixedDepositsAccount(this.fixedDepositsAccountData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['../../'], { relativeTo: this.route });
+            });
+        }
+      });
   }
 
   /**
@@ -211,15 +221,19 @@ export class FixedDepositAccountViewComponent implements OnInit {
    */
   private calculateInterest() {
     const calculateInterestAccountDialogRef = this.dialog.open(CalculateInterestDialogComponent);
-    calculateInterestAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
-        this.fixedDepositsService
-          .executeFixedDepositsAccountCommand(this.fixedDepositsAccountData.id, 'calculateInterest', {})
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    calculateInterestAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.confirm) {
+          this.fixedDepositsService
+            .executeFixedDepositsAccountCommand(this.fixedDepositsAccountData.id, 'calculateInterest', {})
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -227,15 +241,19 @@ export class FixedDepositAccountViewComponent implements OnInit {
    */
   private postInterest() {
     const postInterestAccountDialogRef = this.dialog.open(PostInterestDialogComponent);
-    postInterestAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
-        this.fixedDepositsService
-          .executeFixedDepositsAccountCommand(this.fixedDepositsAccountData.id, 'postInterest', {})
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    postInterestAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.confirm) {
+          this.fixedDepositsService
+            .executeFixedDepositsAccountCommand(this.fixedDepositsAccountData.id, 'postInterest', {})
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -246,17 +264,21 @@ export class FixedDepositAccountViewComponent implements OnInit {
     const deleteSavingsAccountDialogRef = this.dialog.open(ToggleWithholdTaxDialogComponent, {
       data: { isEnable: true }
     });
-    deleteSavingsAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
-        this.savingsService
-          .executeSavingsAccountUpdateCommand(this.fixedDepositsAccountData.id, 'updateWithHoldTax', {
-            withHoldTax: true
-          })
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    deleteSavingsAccountDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.confirm) {
+          this.savingsService
+            .executeSavingsAccountUpdateCommand(this.fixedDepositsAccountData.id, 'updateWithHoldTax', {
+              withHoldTax: true
+            })
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
   }
 
   /**
@@ -267,16 +289,25 @@ export class FixedDepositAccountViewComponent implements OnInit {
     const disableWithHoldTaxDialogRef = this.dialog.open(ToggleWithholdTaxDialogComponent, {
       data: { isEnable: false }
     });
-    disableWithHoldTaxDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
-        this.savingsService
-          .executeSavingsAccountUpdateCommand(this.fixedDepositsAccountData.id, 'updateWithHoldTax', {
-            withHoldTax: false
-          })
-          .subscribe(() => {
-            this.reload();
-          });
-      }
-    });
+    disableWithHoldTaxDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.confirm) {
+          this.savingsService
+            .executeSavingsAccountUpdateCommand(this.fixedDepositsAccountData.id, 'updateWithHoldTax', {
+              withHoldTax: false
+            })
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.reload();
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

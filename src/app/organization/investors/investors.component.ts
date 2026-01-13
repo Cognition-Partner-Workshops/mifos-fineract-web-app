@@ -7,7 +7,7 @@
  */
 
 import { animate, state, style, transition, trigger } from '@angular/animations';
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
@@ -33,6 +33,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { DateFormatPipe } from '../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-investors',
@@ -61,7 +62,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FormatNumberPipe
   ]
 })
-export class InvestorsComponent implements OnInit {
+export class InvestorsComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private settingsService = inject(SettingsService);
   private router = inject(Router);
   private dialog = inject(MatDialog);
@@ -187,13 +189,16 @@ export class InvestorsComponent implements OnInit {
       request['settlementToDate'] = this.dateUtils.formatDate(this.settlementToDate.value, dateFormat);
     }
     payload['request'] = request;
-    this.externalAssetOwnerService.searchExternalAssetOwnerTransfer(payload).subscribe((response: any) => {
-      this.totalRows = response.totalElements;
-      this.existsDataToFilter = response.totalElements > 0;
-      this.dataSource.data = response.content;
-      this.searchResults = response.content;
-      this.isLoading = false;
-    });
+    this.externalAssetOwnerService
+      .searchExternalAssetOwnerTransfer(payload)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.totalRows = response.totalElements;
+        this.existsDataToFilter = response.totalElements > 0;
+        this.dataSource.data = response.content;
+        this.searchResults = response.content;
+        this.isLoading = false;
+      });
   }
 
   transform(data: any): any {
@@ -210,18 +215,22 @@ export class InvestorsComponent implements OnInit {
     const deleteDataTableDialogRef = this.dialog.open(CancelDialogComponent, {
       data: { cancelContext: `the Asset Transfer with the Owner External Id ${transfer.owner.externalId} ` }
     });
-    deleteDataTableDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.cancel) {
-        const payload: any = {
-          transferExternalId: transfer.transferExternalId
-        };
-        this.externalAssetOwnerService
-          .executeExternalAssetOwnerTransferCommand(transfer.transferId, payload, 'cancel')
-          .subscribe((result: any) => {
-            this.reload();
-          });
-      }
-    });
+    deleteDataTableDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.cancel) {
+          const payload: any = {
+            transferExternalId: transfer.transferExternalId
+          };
+          this.externalAssetOwnerService
+            .executeExternalAssetOwnerTransferCommand(transfer.transferId, payload, 'cancel')
+            .pipe(takeUntil(this.destroy$))
+            .subscribe((result: any) => {
+              this.reload();
+            });
+        }
+      });
   }
 
   reload() {
@@ -232,5 +241,10 @@ export class InvestorsComponent implements OnInit {
   private resetPaginator() {
     this.currentPage = 0;
     this.paginator.firstPage();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

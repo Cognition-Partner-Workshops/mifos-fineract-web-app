@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { trigger, state, transition, animate, style } from '@angular/animations';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
@@ -30,6 +30,7 @@ import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { YesnoPipe } from '../../../../pipes/yesno.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-recurring-deposit-general-tab',
@@ -63,7 +64,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     YesnoPipe
   ]
 })
-export class RecurringDepositGeneralTabComponent {
+export class RecurringDepositGeneralTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   recurringDepositProduct: any;
@@ -101,9 +103,16 @@ export class RecurringDepositGeneralTabComponent {
   ];
 
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositProduct: any; recurringDepositProductsTemplate: any }) => {
-      this.recurringDepositProduct = data.recurringDepositProduct;
-      this.recurringDepositProductTemplate = data.recurringDepositProductsTemplate;
-    });
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { recurringDepositProduct: any; recurringDepositProductsTemplate: any }) => {
+        this.recurringDepositProduct = data.recurringDepositProduct;
+        this.recurringDepositProductTemplate = data.recurringDepositProductsTemplate;
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

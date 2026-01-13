@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -18,6 +18,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { DeleteDialogComponent } from '../../../shared/delete-dialog/delete-dialog.component';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View Collateral Component
@@ -31,7 +32,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FaIconComponent
   ]
 })
-export class ViewCollateralComponent {
+export class ViewCollateralComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private productsService = inject(ProductsService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -50,7 +52,7 @@ export class ViewCollateralComponent {
    * @param {TranslateService} translateService Translate Service.
    */
   constructor() {
-    this.route.data.subscribe((data: { collateral: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { collateral: any }) => {
       this.collateralData = data.collateral;
     });
   }
@@ -62,12 +64,23 @@ export class ViewCollateralComponent {
     const deleteCollateralDialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: this.translateService.instant('labels.text.Collateral') + ' ' + this.collateralData.id }
     });
-    deleteCollateralDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.productsService.deleteCollateral(this.collateralData.id).subscribe(() => {
-          this.router.navigate(['/products/collaterals']);
-        });
-      }
-    });
+    deleteCollateralDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.productsService
+            .deleteCollateral(this.collateralData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['/products/collaterals']);
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

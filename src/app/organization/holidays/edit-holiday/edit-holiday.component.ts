@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports. */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormBuilder,
   UntypedFormGroup,
@@ -23,6 +23,7 @@ import { OrganizationService } from 'app/organization/organization.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { AlertService } from 'app/core/alert/alert.service';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Holiday component.
@@ -35,7 +36,8 @@ import { AlertService } from 'app/core/alert/alert.service';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class EditHolidayComponent implements OnInit {
+export class EditHolidayComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private alertService = inject(AlertService);
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
@@ -65,7 +67,7 @@ export class EditHolidayComponent implements OnInit {
    * @param {Router} router Router.
    */
   constructor() {
-    this.route.data.subscribe((data: { holiday: any; holidayTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { holiday: any; holidayTemplate: any }) => {
       this.holidayData = data.holiday;
       this.holidayData.repaymentSchedulingTypes = data.holidayTemplate;
       this.reSchedulingType = this.holidayData.reschedulingType;
@@ -125,14 +127,20 @@ export class EditHolidayComponent implements OnInit {
    * Get Rescheduling Type.
    */
   getReschedulingType() {
-    this.holidayForm.get('reschedulingType').valueChanges.subscribe((option: any) => {
-      this.reSchedulingType = option;
-      if (option === 2) {
-        this.holidayForm.addControl('repaymentsRescheduledTo', new UntypedFormControl(new Date(), Validators.required));
-      } else {
-        this.holidayForm.removeControl('repaymentsRescheduledTo');
-      }
-    });
+    this.holidayForm
+      .get('reschedulingType')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((option: any) => {
+        this.reSchedulingType = option;
+        if (option === 2) {
+          this.holidayForm.addControl(
+            'repaymentsRescheduledTo',
+            new UntypedFormControl(new Date(), Validators.required)
+          );
+        } else {
+          this.holidayForm.removeControl('repaymentsRescheduledTo');
+        }
+      });
   }
 
   /**
@@ -181,9 +189,17 @@ export class EditHolidayComponent implements OnInit {
       dateFormat,
       locale
     };
-    this.organizatioService.updateHoliday(this.holidayData.id, data).subscribe((response) => {
-      /** TODO Add Redirects to ViewMakerCheckerTask page. */
-      this.router.navigate(['../'], { relativeTo: this.route });
-    });
+    this.organizatioService
+      .updateHoliday(this.holidayData.id, data)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response) => {
+        /** TODO Add Redirects to ViewMakerCheckerTask page. */
+        this.router.navigate(['../'], { relativeTo: this.route });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

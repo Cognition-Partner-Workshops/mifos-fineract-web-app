@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, ViewChild, inject } from '@angular/core';
+import { Component, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 /** Custom Services */
@@ -25,6 +25,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { RecurringDepositsAccountInterestRateChartStepComponent } from '../recurring-deposits-account-stepper/recurring-deposits-account-interest-rate-chart-step/recurring-deposits-account-interest-rate-chart-step.component';
 import { RecurringDepositsAccountPreviewStepComponent } from '../recurring-deposits-account-stepper/recurring-deposits-account-preview-step/recurring-deposits-account-preview-step.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create new recurring deposit account
@@ -48,7 +49,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     RecurringDepositsAccountPreviewStepComponent
   ]
 })
-export class CreateRecurringDepositsAccountComponent {
+export class CreateRecurringDepositsAccountComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private dateUtils = inject(Dates);
@@ -71,7 +73,7 @@ export class CreateRecurringDepositsAccountComponent {
   recurringDepositsAccountProductTemplate: any;
 
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositsAccountTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { recurringDepositsAccountTemplate: any }) => {
       this.recurringDepositsAccountTemplate = data.recurringDepositsAccountTemplate;
     });
   }
@@ -158,14 +160,22 @@ export class CreateRecurringDepositsAccountComponent {
       locale
     };
 
-    this.recurringDepositsService.createRecurringDepositAccount(recurringDepositAccount).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.resourceId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.recurringDepositsService
+      .createRecurringDepositAccount(recurringDepositAccount)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.resourceId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

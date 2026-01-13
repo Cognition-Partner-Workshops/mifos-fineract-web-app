@@ -7,13 +7,14 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
 /** Custom Services */
 import { ProductsService } from '../../products.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Create Product mix component.
@@ -26,7 +27,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     ...STANDALONE_SHARED_IMPORTS
   ]
 })
-export class CreateProductMixComponent implements OnInit {
+export class CreateProductMixComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private productsService = inject(ProductsService);
   private route = inject(ActivatedRoute);
@@ -49,7 +51,7 @@ export class CreateProductMixComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { productsMixTemplate: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { productsMixTemplate: any }) => {
       this.productsMixTemplateData = data.productsMixTemplate;
     });
   }
@@ -83,20 +85,26 @@ export class CreateProductMixComponent implements OnInit {
    * Sets the conditional controls of the product mix form.
    */
   setConditionalControls() {
-    this.productMixForm.get('productId').valueChanges.subscribe((productId) => {
-      this.productData = undefined;
-      this.productMixForm.get('restrictedProducts').reset();
-      this.productsService.getProductMixTemplate(productId).subscribe((productMixTemplateData: any) => {
-        const restrictedProductsData = productMixTemplateData.restrictedProducts;
-        this.productData = [
-          ...restrictedProductsData,
-          ...productMixTemplateData.allowedProducts
-        ];
-        this.productMixForm
-          .get('restrictedProducts')
-          .setValue([...restrictedProductsData.map((restrictedProduct: any) => restrictedProduct.id)]);
+    this.productMixForm
+      .get('productId')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((productId) => {
+        this.productData = undefined;
+        this.productMixForm.get('restrictedProducts').reset();
+        this.productsService
+          .getProductMixTemplate(productId)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((productMixTemplateData: any) => {
+            const restrictedProductsData = productMixTemplateData.restrictedProducts;
+            this.productData = [
+              ...restrictedProductsData,
+              ...productMixTemplateData.allowedProducts
+            ];
+            this.productMixForm
+              .get('restrictedProducts')
+              .setValue([...restrictedProductsData.map((restrictedProduct: any) => restrictedProduct.id)]);
+          });
       });
-    });
   }
 
   /**
@@ -108,14 +116,22 @@ export class CreateProductMixComponent implements OnInit {
       restrictedProducts: this.productMixForm.value.restrictedProducts
     };
     const productMixId = this.productMixForm.value.productId;
-    this.productsService.createProductMix(productMix, productMixId).subscribe((response: any) => {
-      this.router.navigate(
-        [
-          '../',
-          response.productId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.productsService
+      .createProductMix(productMix, productMixId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        this.router.navigate(
+          [
+            '../',
+            response.productId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

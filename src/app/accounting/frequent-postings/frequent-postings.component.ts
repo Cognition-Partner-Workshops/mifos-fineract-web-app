@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -25,6 +25,7 @@ import { MatIconButton, MatButton } from '@angular/material/button';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 /**
  * Frequent Postings component.
  */
@@ -39,7 +40,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     CdkTextareaAutosize
   ]
 })
-export class FrequentPostingsComponent implements OnInit {
+export class FrequentPostingsComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private accountingService = inject(AccountingService);
   private settingsService = inject(SettingsService);
@@ -79,12 +81,14 @@ export class FrequentPostingsComponent implements OnInit {
    * @param {Router} router Router for navigation.
    */
   constructor() {
-    this.route.data.subscribe((data: { offices: any; accountingRules: any; currencies: any; paymentTypes: any }) => {
-      this.officeData = data.offices;
-      this.accountingRuleData = data.accountingRules;
-      this.currencyData = data.currencies.selectedCurrencyOptions;
-      this.paymentTypeData = data.paymentTypes;
-    });
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { offices: any; accountingRules: any; currencies: any; paymentTypes: any }) => {
+        this.officeData = data.offices;
+        this.accountingRuleData = data.accountingRules;
+        this.currencyData = data.currencies.selectedCurrencyOptions;
+        this.paymentTypeData = data.paymentTypes;
+      });
   }
 
   /**
@@ -134,20 +138,23 @@ export class FrequentPostingsComponent implements OnInit {
    * Sets the affected gl entry form array.
    */
   setAffectedGLEntryForm() {
-    this.frequentPostingsForm.get('accountingRule').valueChanges.subscribe((accountingRule) => {
-      while (this.debits.length) {
-        this.debits.removeAt(0);
-      }
-      while (this.credits.length) {
-        this.credits.removeAt(0);
-      }
-      this.allowMultipleDebitEntries = accountingRule.allowMultipleDebitEntries;
-      this.allowMultipleCreditEntries = accountingRule.allowMultipleCreditEntries;
-      this.debitAccountData = accountingRule.debitAccounts;
-      this.creditAccountData = accountingRule.creditAccounts;
-      this.addAffectedGLEntry(this.debits);
-      this.addAffectedGLEntry(this.credits);
-    });
+    this.frequentPostingsForm
+      .get('accountingRule')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((accountingRule) => {
+        while (this.debits.length) {
+          this.debits.removeAt(0);
+        }
+        while (this.credits.length) {
+          this.credits.removeAt(0);
+        }
+        this.allowMultipleDebitEntries = accountingRule.allowMultipleDebitEntries;
+        this.allowMultipleCreditEntries = accountingRule.allowMultipleCreditEntries;
+        this.debitAccountData = accountingRule.debitAccounts;
+        this.creditAccountData = accountingRule.creditAccounts;
+        this.addAffectedGLEntry(this.debits);
+        this.addAffectedGLEntry(this.credits);
+      });
   }
 
   /**
@@ -216,14 +223,22 @@ export class FrequentPostingsComponent implements OnInit {
         this.settingsService.dateFormat
       );
     }
-    this.accountingService.createJournalEntry(journalEntry).subscribe((response) => {
-      this.router.navigate(
-        [
-          '../transactions/view',
-          response.transactionId
-        ],
-        { relativeTo: this.route }
-      );
-    });
+    this.accountingService
+      .createJournalEntry(journalEntry)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response) => {
+        this.router.navigate(
+          [
+            '../transactions/view',
+            response.transactionId
+          ],
+          { relativeTo: this.route }
+        );
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

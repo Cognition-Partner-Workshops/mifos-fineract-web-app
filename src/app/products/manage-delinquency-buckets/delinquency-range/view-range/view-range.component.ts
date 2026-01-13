@@ -6,13 +6,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ProductsService } from 'app/products/products.service';
 import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-view-range',
@@ -23,7 +24,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FaIconComponent
   ]
 })
-export class ViewRangeComponent {
+export class ViewRangeComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private dialog = inject(MatDialog);
@@ -33,7 +35,7 @@ export class ViewRangeComponent {
   delinquencyRangeData: any;
 
   constructor() {
-    this.route.data.subscribe((data: { delinquencyRange: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { delinquencyRange: any }) => {
       this.delinquencyRangeData = data.delinquencyRange;
     });
   }
@@ -42,12 +44,23 @@ export class ViewRangeComponent {
     const dialogRef = this.dialog.open(DeleteDialogComponent, {
       data: { deleteContext: this.delinquencyRangeData.classification }
     });
-    dialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.productsService.deleteDelinquencyRange(this.delinquencyRangeData.id).subscribe(() => {
-          this.router.navigate(['../'], { relativeTo: this.route });
-        });
-      }
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.delete) {
+          this.productsService
+            .deleteDelinquencyRange(this.delinquencyRangeData.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(() => {
+              this.router.navigate(['../'], { relativeTo: this.route });
+            });
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

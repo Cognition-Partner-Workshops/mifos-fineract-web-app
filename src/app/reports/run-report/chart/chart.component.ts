@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnChanges, Input, inject } from '@angular/core';
+import { Component, OnChanges, Input, inject, OnDestroy } from '@angular/core';
 
 /** Custom Services */
 import { ReportsService } from '../../reports.service';
@@ -20,6 +20,7 @@ import { Chart, registerables } from 'chart.js';
 import { MatButtonToggleGroup, MatButtonToggle } from '@angular/material/button-toggle';
 import { NgStyle } from '@angular/common';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 // Register Chart.js components
 Chart.register(...registerables);
@@ -38,7 +39,8 @@ Chart.register(...registerables);
     NgStyle
   ]
 })
-export class ChartComponent implements OnChanges {
+export class ChartComponent implements OnChanges, OnDestroy {
+  private destroy$ = new Subject<void>();
   private reportsService = inject(ReportsService);
 
   /** Run Report Data */
@@ -61,6 +63,7 @@ export class ChartComponent implements OnChanges {
   getRunReportData() {
     this.reportsService
       .getChartRunReportData(this.dataObject.report.name, this.dataObject.formData)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: ChartData) => {
         this.inputData = response;
         this.setPieChart(this.inputData);
@@ -159,5 +162,10 @@ export class ChartComponent implements OnChanges {
     const g = Math.floor(Math.random() * 255);
     const b = Math.floor(Math.random() * 255);
     return `rgb(${r},${g},${b},0.6)`;
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

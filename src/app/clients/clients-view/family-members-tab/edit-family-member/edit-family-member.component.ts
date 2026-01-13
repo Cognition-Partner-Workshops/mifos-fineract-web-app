@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -17,6 +17,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Family Member Component
@@ -30,7 +31,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatCheckbox
   ]
 })
-export class EditFamilyMemberComponent implements OnInit {
+export class EditFamilyMemberComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private dateUtils = inject(Dates);
   private router = inject(Router);
@@ -56,7 +58,7 @@ export class EditFamilyMemberComponent implements OnInit {
    * @param {SettingsService} settingsService Setting service
    */
   constructor() {
-    this.route.data.subscribe((data: { clientTemplate: any; editFamilyMember: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { clientTemplate: any; editFamilyMember: any }) => {
       this.addFamilyMemberTemplate = data.clientTemplate.familyMemberOptions;
       this.familyMemberDetails = data.editFamilyMember;
     });
@@ -65,14 +67,17 @@ export class EditFamilyMemberComponent implements OnInit {
   ngOnInit() {
     this.maxDate = this.settingsService.businessDate;
     this.createEditFamilyMemberForm(this.familyMemberDetails);
-    this.editFamilyMemberForm.get('dateOfBirth').valueChanges.subscribe((dateOfBirth: any) => {
-      if (dateOfBirth) {
-        const age = this.calculateAge(dateOfBirth);
-        this.editFamilyMemberForm.get('age').setValue(age);
-      } else {
-        this.editFamilyMemberForm.get('age').setValue('');
-      }
-    });
+    this.editFamilyMemberForm
+      .get('dateOfBirth')
+      .valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe((dateOfBirth: any) => {
+        if (dateOfBirth) {
+          const age = this.calculateAge(dateOfBirth);
+          this.editFamilyMemberForm.get('age').setValue(age);
+        } else {
+          this.editFamilyMemberForm.get('age').setValue('');
+        }
+      });
   }
 
   /**
@@ -164,8 +169,14 @@ export class EditFamilyMemberComponent implements OnInit {
 
     this.clientsService
       .editFamilyMember(this.familyMemberDetails.clientId, this.familyMemberDetails.id, data)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((res) => {
         this.router.navigate(['../../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

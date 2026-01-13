@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort, MatSortHeader } from '@angular/material/sort';
@@ -25,6 +25,7 @@ import {
   MatRow
 } from '@angular/material/table';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * View provisioning journal entries component.
@@ -50,7 +51,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatPaginator
   ]
 })
-export class ViewProvisioningJournalEntriesComponent implements OnInit {
+export class ViewProvisioningJournalEntriesComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Provisioning journal entry data. */
@@ -81,7 +83,7 @@ export class ViewProvisioningJournalEntriesComponent implements OnInit {
    * @param {ActivatedRoute} route Activated Route.
    */
   constructor() {
-    this.route.data.subscribe((data: { provisioningJournalEntry: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { provisioningJournalEntry: any }) => {
       this.provisioningJournalEntryData = data.provisioningJournalEntry.pageItems;
     });
   }
@@ -120,5 +122,10 @@ export class ViewProvisioningJournalEntriesComponent implements OnInit {
    */
   applyFilter(filterValue: string) {
     this.dataSource.filter = filterValue.trim().toLowerCase();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

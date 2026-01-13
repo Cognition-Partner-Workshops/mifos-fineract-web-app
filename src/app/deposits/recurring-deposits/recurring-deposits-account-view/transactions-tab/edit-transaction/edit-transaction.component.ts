@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import {
   UntypedFormGroup,
   UntypedFormBuilder,
@@ -25,6 +25,7 @@ import { Currency } from 'app/shared/models/general.model';
 import { InputAmountComponent } from '../../../../../shared/input-amount/input-amount.component';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Edit Transaction component.
@@ -39,7 +40,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     MatSlideToggle
   ]
 })
-export class EditTransactionComponent implements OnInit {
+export class EditTransactionComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private formBuilder = inject(UntypedFormBuilder);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -79,13 +81,15 @@ export class EditTransactionComponent implements OnInit {
    * @param {SettingsService} settingsService Settings Service
    */
   constructor() {
-    this.route.data.subscribe((data: { recurringDepositsAccountTransactionTemplate: any }) => {
-      this.transactionTemplateData = data.recurringDepositsAccountTransactionTemplate;
-      if (this.transactionTemplateData.currency) {
-        this.currency = this.transactionTemplateData.currency;
-      }
-      this.paymentTypeOptions = this.transactionTemplateData.paymentTypeOptions;
-    });
+    this.route.data
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data: { recurringDepositsAccountTransactionTemplate: any }) => {
+        this.transactionTemplateData = data.recurringDepositsAccountTransactionTemplate;
+        if (this.transactionTemplateData.currency) {
+          this.currency = this.transactionTemplateData.currency;
+        }
+        this.paymentTypeOptions = this.transactionTemplateData.paymentTypeOptions;
+      });
     this.recurringDepositAccountId = this.route.parent.parent.snapshot.params['recurringDepositAccountId'];
   }
 
@@ -163,8 +167,14 @@ export class EditTransactionComponent implements OnInit {
         data,
         this.transactionTemplateData.id
       )
+      .pipe(takeUntil(this.destroy$))
       .subscribe((res) => {
         this.router.navigate(['../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

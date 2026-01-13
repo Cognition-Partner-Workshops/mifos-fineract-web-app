@@ -7,11 +7,12 @@
  */
 
 /** Angular Imports */
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ExternalIdentifierComponent } from '../../../../shared/external-identifier/external-identifier.component';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Office View General Tab
@@ -26,7 +27,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class GeneralTabComponent {
+export class GeneralTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
 
   /** Office data */
@@ -37,8 +39,13 @@ export class GeneralTabComponent {
    * @param {ActivatedRoute} route Activated Route
    */
   constructor() {
-    this.route.data.subscribe((data: { office: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { office: any }) => {
       this.officeData = data.office;
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

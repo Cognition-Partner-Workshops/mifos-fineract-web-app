@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Accounting } from 'app/core/utils/accounting';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
@@ -27,6 +27,7 @@ import { ViewSavingsAccountingDetailsComponent } from '../../../../shared/accoun
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { YesnoPipe } from '../../../../pipes/yesno.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'mifosx-saving-product-general-tab',
@@ -51,7 +52,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     YesnoPipe
   ]
 })
-export class SavingProductGeneralTabComponent {
+export class SavingProductGeneralTabComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private accounting = inject(Accounting);
 
@@ -73,7 +75,7 @@ export class SavingProductGeneralTabComponent {
   ];
 
   constructor() {
-    this.route.data.subscribe((data: { savingProduct: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { savingProduct: any }) => {
       this.savingProduct = data.savingProduct;
     });
   }
@@ -84,5 +86,10 @@ export class SavingProductGeneralTabComponent {
 
   isAccrualAccounting(): boolean {
     return this.accounting.isAccrualAccounting(this.savingProduct.accountingRule);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, Input, inject } from '@angular/core';
+import { Component, OnInit, Input, inject, OnDestroy } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -15,6 +15,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CentersService } from '../../../centers.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Staff Assignment History Component
@@ -28,7 +29,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     FaIconComponent
   ]
 })
-export class StaffAssignmentHistoryComponent implements OnInit {
+export class StaffAssignmentHistoryComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private sanitizer = inject(DomSanitizer);
   private route = inject(ActivatedRoute);
 
@@ -41,7 +43,7 @@ export class StaffAssignmentHistoryComponent implements OnInit {
    * @param {DomSanitizer} sanitizer DOM Sanitizer
    */
   constructor() {
-    this.route.data.subscribe((data: { centersActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { centersActionData: any }) => {
       this.staffAssignmentHistoryData = data.centersActionData;
     });
   }
@@ -51,5 +53,10 @@ export class StaffAssignmentHistoryComponent implements OnInit {
     const file = new Blob([this.staffAssignmentHistoryData.body], { type: contentType });
     const filecontent = URL.createObjectURL(file);
     this.pentahoUrl = this.sanitizer.bypassSecurityTrustResourceUrl(filecontent);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

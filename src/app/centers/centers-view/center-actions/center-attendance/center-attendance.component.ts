@@ -7,7 +7,7 @@
  */
 
 /** Angular Imports */
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
 import { UntypedFormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -43,6 +43,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { FindPipe } from '../../../../pipes/find.pipe';
 import { DateFormatPipe } from '../../../../pipes/date-format.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+import { Subject, takeUntil } from 'rxjs';
 
 /**
  * Center Attendance component.
@@ -72,7 +73,8 @@ import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
     DateFormatPipe
   ]
 })
-export class CenterAttendanceComponent implements OnInit {
+export class CenterAttendanceComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   private route = inject(ActivatedRoute);
   private dateUtils = inject(Dates);
   private router = inject(Router);
@@ -113,7 +115,7 @@ export class CenterAttendanceComponent implements OnInit {
    * @param {MatDialog} dialog Mat Dialog
    */
   constructor() {
-    this.route.data.subscribe((data: { centersActionData: any }) => {
+    this.route.data.pipe(takeUntil(this.destroy$)).subscribe((data: { centersActionData: any }) => {
       this.centerData = data.centersActionData;
       this.membersData = data.centersActionData.clients;
     });
@@ -139,6 +141,7 @@ export class CenterAttendanceComponent implements OnInit {
   getAttendanceOptions() {
     this.centersService
       .getMeetingsTemplate(this.centerData.id, this.centerData.collectionMeetingCalendar.id)
+      .pipe(takeUntil(this.destroy$))
       .subscribe((response: any) => {
         this.attendanceTypeOptions = response.attendanceTypeOptions;
       });
@@ -167,13 +170,16 @@ export class CenterAttendanceComponent implements OnInit {
       formfields: formfields
     };
     const memberAttendanceDialogRef = this.dialog.open(FormDialogComponent, { data });
-    memberAttendanceDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.data) {
-        const updatedMemeber = { ...member, ...response.data.value };
-        this.dataSource.splice(this.dataSource.indexOf(member), 1, updatedMemeber);
-        this.dataSource = this.dataSource.concat([]);
-      }
-    });
+    memberAttendanceDialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((response: any) => {
+        if (response.data) {
+          const updatedMemeber = { ...member, ...response.data.value };
+          this.dataSource.splice(this.dataSource.indexOf(member), 1, updatedMemeber);
+          this.dataSource = this.dataSource.concat([]);
+        }
+      });
   }
 
   /**
@@ -193,8 +199,14 @@ export class CenterAttendanceComponent implements OnInit {
     };
     this.centersService
       .assignCenterAttendance(this.centerData.id, this.centerData.collectionMeetingCalendar.id, data)
+      .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.router.navigate(['../../'], { relativeTo: this.route });
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }
