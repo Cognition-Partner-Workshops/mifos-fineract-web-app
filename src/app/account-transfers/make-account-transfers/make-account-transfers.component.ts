@@ -23,6 +23,9 @@ import { AccountTransfersService } from '../account-transfers.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { ClientsService } from 'app/clients/clients.service';
 import { Dates } from 'app/core/utils/dates';
+import { Logger } from 'app/core/logger/logger.service';
+
+const log = new Logger('MakeAccountTransfersComponent');
 
 /** Environment Configuration */
 import { environment } from '../../../environments/environment';
@@ -232,7 +235,7 @@ export class MakeAccountTransfersComponent implements OnInit, AfterViewInit {
 
   createMakeAccountInterbankTransferForm(account: any) {
     if (!account) {
-      console.error('Account data is undefined');
+      log.error('Account data is undefined');
       this.isLoading = false;
       return;
     }
@@ -387,7 +390,7 @@ export class MakeAccountTransfersComponent implements OnInit, AfterViewInit {
     this.isLoading = true;
 
     if (!this.makeAccountTransferForm.valid) {
-      console.error('Interbank form is not valid');
+      log.error('Interbank form is not valid');
       this.isLoading = false;
       return;
     }
@@ -426,7 +429,7 @@ export class MakeAccountTransfersComponent implements OnInit, AfterViewInit {
         }
       },
       (error) => {
-        console.error('Interbank transfer error:', error);
+        log.error('Interbank transfer error:', error);
         this.isLoading = false;
       }
     );
@@ -446,7 +449,7 @@ export class MakeAccountTransfersComponent implements OnInit, AfterViewInit {
           this.createMakeAccountInterbankTransferForm(acc);
         },
         (error) => {
-          console.error('searching account error:', error);
+          log.error('searching account error:', error);
           this.isLoading = false;
         }
       );

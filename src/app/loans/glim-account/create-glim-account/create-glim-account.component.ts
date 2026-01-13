@@ -16,6 +16,9 @@ import { LoansService } from '../../loans.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { ClientsService } from 'app/clients/clients.service';
+import { Logger } from 'app/core/logger/logger.service';
+
+const log = new Logger('CreateGlimAccountComponent');
 
 /** Step Components */
 import { LoansAccountDetailsStepComponent } from '../../loans-account-stepper/loans-account-details-step/loans-account-details-step.component';
@@ -118,7 +121,7 @@ export class CreateGlimAccountComponent {
       // Fineract API doesn't have "Group Collateral Management" endpoint; from the obsolete
       // community app it appears getCollateralTemplate(clientId) is called as well, but it's not clear how
       // the clientId is selected from the clientIds that belong to the group.
-      console.error('No collateral data requested from Fineract, collateral might misbehave');
+      log.error('No collateral data requested from Fineract, collateral might misbehave');
     }
     const entityId = this.loansAccountTemplate.clientId
       ? this.loansAccountTemplate.clientId
@@ -316,6 +319,6 @@ export class CreateGlimAccountComponent {
       for (const e of body.errors) parts.push(String(e?.developerMessage ?? ''));
     }
     if (context) parts.push(`Context: ${JSON.stringify(context)}`);
-    console.error(parts.join(' ').trim());
+    log.error(parts.join(' ').trim());
   }
 }

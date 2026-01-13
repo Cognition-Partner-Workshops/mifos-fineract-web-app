@@ -23,6 +23,9 @@ import {
   MatRowDef,
   MatRow
 } from '@angular/material/table';
+import { Logger } from 'app/core/logger/logger.service';
+
+const log = new Logger('ViewLoanProvisioningCriteriaComponent');
 
 /** Custom Services */
 import { OrganizationService } from 'app/organization/organization.service';
@@ -128,7 +131,7 @@ export class ViewLoanProvisioningCriteriaComponent implements OnInit {
             this.router.navigate(['/organization/provisioning-criteria']);
           },
           (error) => {
-            console.error('Failed to delete provisioning criteria:', error);
+            log.error('Failed to delete provisioning criteria:', error);
           }
         );
       }

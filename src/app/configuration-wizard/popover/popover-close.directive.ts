@@ -11,6 +11,9 @@ import { Directive, HostListener, Input, inject } from '@angular/core';
 
 /** Popover Ref */
 import { PopoverRef } from './popover-ref';
+import { Logger } from 'app/core/logger/logger.service';
+
+const log = new Logger('PopoverCloseDirective');
 
 /**
  * Button that will close the current popover.
@@ -23,7 +26,7 @@ export class PopoverCloseDirective<T = any> {
 
   @HostListener('click') onClick(): void {
     if (!this.popoverRef) {
-      console.error('PopoverClose is not supported within a template');
+      log.error('PopoverClose is not supported within a template');
 
       return;
     }

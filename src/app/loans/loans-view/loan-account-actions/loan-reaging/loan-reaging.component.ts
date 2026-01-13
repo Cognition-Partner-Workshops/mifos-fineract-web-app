@@ -11,6 +11,7 @@ import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { Dates } from 'app/core/utils/dates';
+import { Logger } from 'app/core/logger/logger.service';
 import { LoansService } from 'app/loans/loans.service';
 import { RepaymentSchedule } from 'app/loans/models/loan-account.model';
 import { SettingsService } from 'app/settings/settings.service';
@@ -20,6 +21,8 @@ import { ReAgePreviewDialogComponent } from './re-age-preview-dialog/re-age-prev
 import { InputAmountComponent } from 'app/shared/input-amount/input-amount.component';
 import { LoanTransactionTemplate } from 'app/loans/models/loan-transaction-type.model';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
+
+const log = new Logger('LoanReagingComponent');
 
 @Component({
   selector: 'mifosx-loan-reaging',
@@ -135,7 +138,7 @@ export class LoanReagingComponent implements OnInit {
         const currencyCode = response.currency?.code || this.loanTransactionData.currency.code;
 
         if (!currencyCode) {
-          console.error('Currency code is not available in API response or loan details');
+          log.error('Currency code is not available in API response or loan details');
           return;
         }
 
@@ -150,7 +153,7 @@ export class LoanReagingComponent implements OnInit {
         });
       },
       error: (error) => {
-        console.error('Error loading re-age preview:', error);
+        log.error('Error loading re-age preview:', error);
       }
     });
   }
@@ -172,7 +175,7 @@ export class LoanReagingComponent implements OnInit {
         this.router.navigate(['../../transactions'], { relativeTo: this.route });
       },
       error: (error) => {
-        console.error('Error submitting re-age:', error);
+        log.error('Error submitting re-age:', error);
       }
     });
   }

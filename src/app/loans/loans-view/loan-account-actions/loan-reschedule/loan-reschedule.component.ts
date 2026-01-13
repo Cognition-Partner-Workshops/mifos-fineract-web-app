@@ -20,11 +20,14 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 /** Custom Services */
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
+import { Logger } from 'app/core/logger/logger.service';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { PenaltyManagementService } from 'app/loans/services/penalty-management.service';
 import { FormatNumberPipe } from '../../../../pipes/format-number.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
+const log = new Logger('LoanRescheduleComponent');
 
 @Component({
   selector: 'mifosx-loan-reschedule',
@@ -141,7 +144,7 @@ export class LoanRescheduleComponent implements OnInit {
           this.submitReschedule(data);
         },
         error: (error: any) => {
-          console.error('Error waiving penalties:', error);
+          log.error('Error waiving penalties:', error);
           // Continue with reschedule even if waive fails
           this.submitReschedule(data);
         }
@@ -172,7 +175,7 @@ export class LoanRescheduleComponent implements OnInit {
         this.penalties = penalties;
       },
       error: (error: any) => {
-        console.error('Error loading penalties:', error);
+        log.error('Error loading penalties:', error);
         this.penalties = [];
       }
     });

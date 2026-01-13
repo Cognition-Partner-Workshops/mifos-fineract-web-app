@@ -10,6 +10,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { CollectionsService } from '../collections.service';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Logger } from 'app/core/logger/logger.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
@@ -19,6 +20,8 @@ import { CentersService } from 'app/centers/centers.service';
 import { GroupsService } from 'app/groups/groups.service';
 import { Dates } from 'app/core/utils/dates';
 import { CollectionSheetData, JLGGroupData, MeetingFallCenter } from '../models/collection-sheet-data.model';
+
+const log = new Logger('CollectionSheetComponent');
 
 @Component({
   selector: 'mifosx-collection-sheet',
@@ -140,7 +143,7 @@ export class CollectionSheetComponent implements OnInit {
           this.collectionsService
             .generateCollectionSheetData(this.meetingFallCenters[0].id, payload)
             .subscribe((jlgGroupData: JLGGroupData) => {
-              console.log(jlgGroupData);
+              log.debug('JLG Group Data:', jlgGroupData);
             });
         }
       });

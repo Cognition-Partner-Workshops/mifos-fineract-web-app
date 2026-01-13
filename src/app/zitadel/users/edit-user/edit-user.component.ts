@@ -13,9 +13,12 @@ import { UntypedFormGroup, UntypedFormBuilder, Validators } from '@angular/forms
 /** Custom Services */
 import { UsersServiceZitadel } from '../usersZitadel.service';
 import { UsersService } from 'app/users/users.service';
+import { Logger } from 'app/core/logger/logger.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { COUNTRY_CODES } from 'app/zitadel/constants/coutry-codes';
 import { ZITADEL_LANGUAGES } from 'app/zitadel/constants/languages';
+
+const log = new Logger('EditUserComponent');
 /**
  * Edit User Component.
  */
@@ -169,7 +172,7 @@ export class EditUserComponent implements OnInit {
    */
   officeChanged(officeId: number | undefined) {
     if (!officeId) {
-      console.warn('No officeId provided to load staff.');
+      log.warn('No officeId provided to load staff.');
       return;
     }
 

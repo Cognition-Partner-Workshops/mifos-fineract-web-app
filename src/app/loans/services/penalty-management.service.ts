@@ -9,8 +9,11 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
+import { Logger } from 'app/core/logger/logger.service';
 import { LoansService } from '../loans.service';
 import { Dates } from 'app/core/utils/dates';
+
+const log = new Logger('PenaltyManagementService');
 
 /**
  * Service for managing loan penalty charges
@@ -212,7 +215,7 @@ export class PenaltyManagementService {
     const waiveRequests = penaltyIds.map((chargeId: number) =>
       this.loanService.executeLoansAccountChargesCommand(loanId, 'waive', {}, chargeId).pipe(
         catchError((error: any) => {
-          console.error(`Error waiving penalty ${chargeId}:`, error);
+          log.error(`Error waiving penalty ${chargeId}:`, error);
           // Return null for failed waive operations so we can continue with others
           return of(null);
         })

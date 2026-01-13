@@ -8,8 +8,11 @@
 
 import { Component, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { Logger } from 'app/core/logger/logger.service';
 import { AuthenticationService } from '../../core/authentication/authentication.service';
 import { AlertService } from '../../core/alert/alert.service';
+
+const log = new Logger('CallbackComponent');
 
 @Component({
   selector: 'mifosx-callback',
@@ -34,7 +37,7 @@ export class CallbackComponent implements OnInit {
         this.router.navigate(['/login']);
       }
     } catch (error) {
-      console.error('Authentication callback failed:', error);
+      log.error('Authentication callback failed:', error);
       this.alertService.alert({
         type: 'Authentication Error',
         message: 'An error occurred during authentication. Please try again.'

@@ -24,9 +24,12 @@ import {
   MatRowDef,
   MatRow
 } from '@angular/material/table';
+import { Logger } from 'app/core/logger/logger.service';
 import { DatetimeFormatPipe } from '../../../pipes/datetime-format.pipe';
 import { TranslatePipe } from '../../../pipes/translate.pipe';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+
+const log = new Logger('ViewAuditComponent');
 
 /**
  * View Audit Component.
@@ -108,7 +111,7 @@ export class ViewAuditComponent implements OnInit {
       }
       return [];
     } catch (err) {
-      console.error('Invalid commandAsJson in audit trail:', err);
+      log.error('Invalid commandAsJson in audit trail:', err);
       return [];
     }
   }

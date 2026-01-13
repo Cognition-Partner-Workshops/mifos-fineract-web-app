@@ -22,6 +22,9 @@ import { MatDialog } from '@angular/material/dialog';
 //import { UsersService } from '../users.service';
 import { UsersServiceZitadel } from '../usersZitadel.service';
 import { PopoverService } from '../../../configuration-wizard/popover/popover.service';
+import { Logger } from 'app/core/logger/logger.service';
+
+const log = new Logger('CreateUserComponent');
 
 /** Custom Dialog Component */
 import { PasswordsUtility } from 'app/core/utils/passwords-utility';
@@ -273,19 +276,19 @@ export class CreateUserComponent implements OnInit, AfterViewInit {
                   }
                 },
                 (error) => {
-                  console.error('Failed to assign roles to user:', error);
+                  log.error('Failed to assign roles to user:', error);
                 }
               );
             } else {
-              console.warn('No roles were selected for this user.');
+              log.warn('No roles were selected for this user.');
             }
           },
           (error) => {
-            console.error('Failed to create user record in database:', error);
+            log.error('Failed to create user record in database:', error);
           }
         );
       } else {
-        console.error('User creation failed: userId not returned by API.');
+        log.error('User creation failed: userId not returned by API.');
       }
     });
   }

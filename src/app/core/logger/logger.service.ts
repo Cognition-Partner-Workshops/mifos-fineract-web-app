@@ -55,6 +55,83 @@ export enum LogLevel {
  */
 export type LogOutput = (source: string, level: LogLevel, ...objects: any[]) => void;
 
+/**
+ * Loki log output handler for external log aggregation.
+ * Sends logs to a Loki instance if configured.
+ */
+export class LokiOutput {
+  private lokiUrl: string | null = null;
+  private batchSize = 10;
+  private batchTimeout = 5000;
+  private logBatch: any[] = [];
+  private batchTimer: any = null;
+
+  constructor() {
+    const lokiUrl = (window as any).env?.lokiUrl;
+    if (lokiUrl) {
+      this.lokiUrl = lokiUrl;
+    }
+  }
+
+  handler: LogOutput = (source: string, level: LogLevel, ...objects: any[]) => {
+    if (!this.lokiUrl) {
+      return;
+    }
+
+    const timestamp = Date.now() * 1000000;
+    const levelName = LogLevel[level].toLowerCase();
+    const message = objects.map((obj) => (typeof obj === 'object' ? JSON.stringify(obj) : String(obj))).join(' ');
+
+    const logEntry = {
+      stream: {
+        app: 'mifos-web-app',
+        level: levelName,
+        source: source || 'unknown'
+      },
+      values: [[
+          timestamp.toString(),
+          message
+        ]]
+    };
+
+    this.logBatch.push(logEntry);
+
+    if (this.logBatch.length >= this.batchSize) {
+      this.flush();
+    } else if (!this.batchTimer) {
+      this.batchTimer = setTimeout(() => this.flush(), this.batchTimeout);
+    }
+  };
+
+  private flush() {
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+
+    if (this.logBatch.length === 0 || !this.lokiUrl) {
+      return;
+    }
+
+    const payload = {
+      streams: this.logBatch
+    };
+
+    const batch = this.logBatch;
+    this.logBatch = [];
+
+    fetch(`${this.lokiUrl}/loki/api/v1/push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    }).catch(() => {
+      // Silently fail to avoid logging errors about logging
+    });
+  }
+}
+
 export class Logger {
   /**
    * Current logging level.

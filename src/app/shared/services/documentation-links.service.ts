@@ -7,8 +7,11 @@
  */
 
 import { Injectable } from '@angular/core';
+import { Logger } from 'app/core/logger/logger.service';
 import { environment } from '../../../environments/environment';
 import { DOCUMENTATION_PATHS, DocumentationPage } from '../constants/documentation-links';
+
+const log = new Logger('DocumentationLinksService');
 
 const DEFAULT_DOCUMENTATION_BASE_URL = 'https://mifosforge.jira.com/wiki';
 
@@ -24,7 +27,7 @@ export class DocumentationLinksService {
   getUrl(page: DocumentationPage): string {
     const path = DOCUMENTATION_PATHS[page];
     if (!path) {
-      console.warn(`Unknown documentation page key requested: ${page}`);
+      log.warn(`Unknown documentation page key requested: ${page}`);
       return this.baseUrl;
     }
     return this.buildUrl(path);

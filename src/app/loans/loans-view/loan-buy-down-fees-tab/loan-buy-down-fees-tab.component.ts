@@ -21,10 +21,13 @@ import {
 } from '@angular/material/table';
 import { ActivatedRoute } from '@angular/router';
 import { FormatNumberPipe } from '@pipes/format-number.pipe';
+import { Logger } from 'app/core/logger/logger.service';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { LoansService } from '../../loans.service';
 import { BuyDownFeeAmortizationDetails } from '../../models/loan-account.model';
 import { DateFormatPipe } from '@pipes/date-format.pipe';
+
+const log = new Logger('LoanBuyDownFeesTabComponent');
 
 @Component({
   selector: 'mifosx-loan-buy-down-fees-tab',
@@ -87,12 +90,12 @@ export class LoanBuyDownFeesTabComponent implements OnInit {
       }
     }
 
-    console.error('Could not find loanId in route parameters');
+    log.error('Could not find loanId in route parameters');
   }
 
   private loadBuyDownFees(): void {
     if (!this.loanId) {
-      console.error('Cannot load buy down fees: loanId is undefined');
+      log.error('Cannot load buy down fees: loanId is undefined');
       this.isLoading = false;
       return;
     }
@@ -104,7 +107,7 @@ export class LoanBuyDownFeesTabComponent implements OnInit {
         this.isLoading = false;
       },
       error: (error) => {
-        console.error('Error loading buy down fees:', error);
+        log.error('Error loading buy down fees:', error);
         this.isLoading = false;
       }
     });

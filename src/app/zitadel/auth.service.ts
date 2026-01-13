@@ -11,7 +11,10 @@ import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { OAuthService } from 'angular-oauth2-oidc';
 
+import { Logger } from 'app/core/logger/logger.service';
 import { environment } from '../../environments/environment';
+
+const log = new Logger('AuthService');
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -101,7 +104,7 @@ export class AuthService {
           });
         }
       })
-      .catch((error) => console.error(`Error retrieving users: ${error}`));
+      .catch((error) => log.error(`Error retrieving users: ${error}`));
   }
 
   public createRole(roleKey: string, displayName: string, group: string) {

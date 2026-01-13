@@ -20,7 +20,10 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
+import { Logger } from 'app/core/logger/logger.service';
 import { Dates } from 'app/core/utils/dates';
+
+const log = new Logger('RepaymentScheduleTabComponent');
 import {
   RepaymentSchedule,
   RepaymentSchedulePeriod,
@@ -168,7 +171,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
           this.initializeRepaymentSchedule();
         },
         error: (err) => {
-          console.error('Failed to load loan repayment schedule data:', err);
+          log.error('Failed to load loan repayment schedule data:', err);
           this.loanDetailsDataRepaymentSchedule = this.getDefaultRepaymentSchedule();
           this.initializeRepaymentSchedule();
         }

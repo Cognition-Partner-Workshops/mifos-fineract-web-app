@@ -10,8 +10,11 @@ import { Injectable, inject } from '@angular/core';
 import { HttpEvent, HttpInterceptor, HttpHandler, HttpRequest, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError, from } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { Logger } from 'app/core/logger/logger.service';
 import { AuthService } from './auth.service';
 import { environment } from '../../environments/environment';
+
+const log = new Logger('TokenInterceptor');
 
 @Injectable()
 export class TokenInterceptor implements HttpInterceptor {
@@ -65,7 +68,7 @@ export class TokenInterceptor implements HttpInterceptor {
         throw new Error('No new access token obtained after refresh');
       }
     } catch (e) {
-      console.error('Error in handle401Error, forcing logout');
+      log.error('Error in handle401Error, forcing logout');
       throw e;
     }
   }

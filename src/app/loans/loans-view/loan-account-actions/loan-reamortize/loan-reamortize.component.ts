@@ -10,6 +10,7 @@ import { Component, Input, OnInit, inject } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
+import { Logger } from 'app/core/logger/logger.service';
 import { LoansService } from 'app/loans/loans.service';
 import { RepaymentSchedule } from 'app/loans/models/loan-account.model';
 import { CodeValue } from 'app/shared/models/general.model';
@@ -17,6 +18,8 @@ import { OptionData } from 'app/shared/models/option-data.model';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 import { SettingsService } from 'app/settings/settings.service';
 import { ReAmortizePreviewDialogComponent } from './re-amortize-preview-dialog/re-amortize-preview-dialog.component';
+
+const log = new Logger('LoanReamortizeComponent');
 
 @Component({
   selector: 'mifosx-loan-reamortize',
@@ -112,7 +115,7 @@ export class LoanReamortizeComponent implements OnInit {
         const currencyCode = response.currency?.code;
 
         if (!currencyCode) {
-          console.error('Currency code is not available in API response');
+          log.error('Currency code is not available in API response');
           return;
         }
 
@@ -127,7 +130,7 @@ export class LoanReamortizeComponent implements OnInit {
         });
       },
       error: (error) => {
-        console.error('Error loading re-amortize preview:', error);
+        log.error('Error loading re-amortize preview:', error);
       }
     });
   }

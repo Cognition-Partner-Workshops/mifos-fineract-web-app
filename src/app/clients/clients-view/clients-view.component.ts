@@ -11,6 +11,9 @@ import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { DomSanitizer } from '@angular/platform-browser';
 import { MatDialog } from '@angular/material/dialog';
+import { Logger } from 'app/core/logger/logger.service';
+
+const log = new Logger('ClientsViewComponent');
 
 /** Custom Dialogs */
 import { UnassignStaffDialogComponent } from './custom-dialogs/unassign-staff-dialog/unassign-staff-dialog.component';
@@ -109,7 +112,7 @@ export class ClientsViewComponent implements OnInit {
       },
       error: (error: any) => {
         // Handle any unexpected errors
-        console.error('Error loading client profile image:', error);
+        log.error('Error loading client profile image:', error);
         this.clientImage = null;
       }
     });

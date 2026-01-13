@@ -10,6 +10,9 @@ import { Injectable, inject } from '@angular/core';
 import { Resolve, ActivatedRouteSnapshot } from '@angular/router';
 import { Observable } from 'rxjs';
 import { LoansService } from '../loans.service';
+import { Logger } from '../../core/logger/logger.service';
+
+const log = new Logger('LoanBuyDownFeesDataResolver');
 
 @Injectable()
 export class LoanBuyDownFeesDataResolver implements Resolve<Object> {
@@ -19,7 +22,7 @@ export class LoanBuyDownFeesDataResolver implements Resolve<Object> {
     const loanId = route.paramMap.get('loanId') || route.parent.paramMap.get('loanId');
 
     if (!loanId) {
-      console.error('LoanBuyDownFeesDataResolver: Could not find loanId in route parameters');
+      log.error('Could not find loanId in route parameters');
       return new Observable((observer) => {
         observer.next([]);
         observer.complete();

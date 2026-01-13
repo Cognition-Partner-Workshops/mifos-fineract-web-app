@@ -15,8 +15,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
+import { Logger } from 'app/core/logger/logger.service';
 import { Currency } from 'app/shared/models/general.model';
 import { PenaltyManagementService } from 'app/loans/services/penalty-management.service';
+
+const log = new Logger('MakeRepaymentComponent');
 import { InputAmountComponent } from '../../../../shared/input-amount/input-amount.component';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatCheckbox } from '@angular/material/checkbox';
@@ -190,7 +193,7 @@ export class MakeRepaymentComponent implements OnInit {
         this.penalties = penalties;
       },
       error: (error: any) => {
-        console.error('Error loading penalties:', error);
+        log.error('Error loading penalties:', error);
         this.penalties = [];
       }
     });
@@ -341,7 +344,7 @@ export class MakeRepaymentComponent implements OnInit {
           this.submitRepayment(data);
         },
         error: (error: any) => {
-          console.error('Error waiving penalties:', error);
+          log.error('Error waiving penalties:', error);
           // Continue with repayment even if waive fails
           this.submitRepayment(data);
         }

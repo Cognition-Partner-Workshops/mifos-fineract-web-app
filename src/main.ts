@@ -17,6 +17,9 @@ import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
 
 import { AppModule } from './app/app.module';
 import { environment } from './environments/environment';
+import { Logger } from './app/core/logger/logger.service';
+
+const log = new Logger('Bootstrap');
 
 if (environment.production) {
   enableProdMode();
@@ -24,4 +27,4 @@ if (environment.production) {
 
 platformBrowserDynamic()
   .bootstrapModule(AppModule)
-  .catch((err) => console.log(err));
+  .catch((err) => log.error(err));

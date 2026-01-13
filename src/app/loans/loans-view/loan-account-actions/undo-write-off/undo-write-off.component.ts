@@ -16,6 +16,9 @@ import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { AlertService } from 'app/core/alert/alert.service';
 import { Dates } from 'app/core/utils/dates';
+import { Logger } from 'app/core/logger/logger.service';
+
+const log = new Logger('UndoWriteOffComponent');
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
 
@@ -98,7 +101,7 @@ export class UndoWriteOffComponent implements OnInit {
         this.router.navigate(['../../general'], { relativeTo: this.route });
       },
       error: (error) => {
-        console.error('Undo write-off failed:', error);
+        log.error('Undo write-off failed:', error);
         this.alertService.alert({
           type: 'Undo Write-off Failed',
           message:

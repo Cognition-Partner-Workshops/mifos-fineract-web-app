@@ -16,6 +16,7 @@ import type { LightGallery } from 'lightgallery/lightgallery';
 import type { GalleryItem } from 'lightgallery/lg-utils';
 import { UploadDocumentDialogComponent } from 'app/clients/clients-view/custom-dialogs/upload-document-dialog/upload-document-dialog.component';
 import { ClientsService } from 'app/clients/clients.service';
+import { Logger } from 'app/core/logger/logger.service';
 import { LoansService } from 'app/loans/loans.service';
 import { SavingsService } from 'app/savings/savings.service';
 import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
@@ -23,6 +24,8 @@ import { DocumentPreviewService } from 'app/shared/services/document-preview.ser
 import { Observable } from 'rxjs';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+
+const log = new Logger('EntityDocumentsTabComponent');
 
 @Component({
   selector: 'mifosx-entity-documents-tab',
@@ -145,7 +148,7 @@ export class EntityDocumentsTabComponent implements OnInit, OnDestroy {
             iframe: preview.type === 'pdf'
           });
         } catch (error) {
-          console.error('Preview failed for document', item.id, error);
+          log.error('Preview failed for document', item.id, error);
         }
       }
 
@@ -170,7 +173,7 @@ export class EntityDocumentsTabComponent implements OnInit, OnDestroy {
 
       this.lightboxInstance.openGallery(startIndex);
     } catch (error) {
-      console.error('Unable to open preview', error);
+      log.error('Unable to open preview', error);
     }
   }
 

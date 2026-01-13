@@ -11,6 +11,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { Dates } from 'app/core/utils/dates';
+import { Logger } from 'app/core/logger/logger.service';
 import { LoansService } from 'app/loans/loans.service';
 import { EditableRepaymentSchedule, EditablePeriod, ScheduleChangeRecord } from 'app/loans/models/loan-account.model';
 import { SettingsService } from 'app/settings/settings.service';
@@ -21,6 +22,8 @@ import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
 import { SelectBase } from 'app/shared/form-dialog/formfield/model/select-base';
 import { RepaymentScheduleTabComponent } from '../../repayment-schedule-tab/repayment-schedule-tab.component';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+
+const log = new Logger('EditRepaymentScheduleComponent');
 
 @Component({
   selector: 'mifosx-edit-repayment-schedule',
@@ -74,7 +77,7 @@ export class EditRepaymentScheduleComponent implements OnInit {
         this.repaymentScheduleDetails = response.repaymentSchedule;
       },
       error: (err) => {
-        console.error('Failed to load repayment schedule:', err);
+        log.error('Failed to load repayment schedule:', err);
       }
     });
   }
@@ -164,7 +167,7 @@ export class EditRepaymentScheduleComponent implements OnInit {
             this.wasValidated = false;
           },
           error: (err) => {
-            console.error('Failed to delete schedule variations:', err);
+            log.error('Failed to delete schedule variations:', err);
           }
         });
       }
@@ -190,7 +193,7 @@ export class EditRepaymentScheduleComponent implements OnInit {
           }
         },
         error: (err) => {
-          console.error('Failed to calculate loan schedule:', err);
+          log.error('Failed to calculate loan schedule:', err);
         }
       });
   }
@@ -201,7 +204,7 @@ export class EditRepaymentScheduleComponent implements OnInit {
         this.router.navigate(['../../repayment-schedule'], { relativeTo: this.route });
       },
       error: (err) => {
-        console.error('Failed to add schedule variations:', err);
+        log.error('Failed to add schedule variations:', err);
       }
     });
   }

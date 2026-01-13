@@ -35,11 +35,14 @@ import lgThumbnail from 'lightgallery/plugins/thumbnail';
 import lgZoom from 'lightgallery/plugins/zoom';
 import type { LightGallery } from 'lightgallery/lightgallery';
 import type { GalleryItem } from 'lightgallery/lg-utils';
+import { Logger } from 'app/core/logger/logger.service';
 import { DocumentPreviewService } from 'app/shared/services/document-preview.service';
 import { TranslateService } from '@ngx-translate/core';
 import { ClientsService } from '../../clients.service';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { STANDALONE_SHARED_IMPORTS } from 'app/standalone-shared.module';
+
+const log = new Logger('IdentitiesTabComponent');
 
 /**
  * Identities Tab Component
@@ -210,7 +213,7 @@ export class IdentitiesTabComponent implements OnDestroy {
                   this.setThumbnail(newDoc);
                 },
                 error: (err: any) => {
-                  console.error('Failed to upload document', err);
+                  log.error('Failed to upload document', err);
                   // Still add the identifier even if document upload fails
                   this.clientIdentities.push(newIdentity);
                   this.identifiersTable.renderRows();
@@ -223,7 +226,7 @@ export class IdentitiesTabComponent implements OnDestroy {
             }
           },
           error: (err: any) => {
-            console.error('Failed to create identifier', err);
+            log.error('Failed to create identifier', err);
           }
         });
       }
@@ -276,7 +279,7 @@ export class IdentitiesTabComponent implements OnDestroy {
             iframe: preview.type === 'pdf'
           });
         } catch (error) {
-          console.error('Preview failed for document', doc.id, error);
+          log.error('Preview failed for document', doc.id, error);
         }
       }
       if (!items.length) {
@@ -299,7 +302,7 @@ export class IdentitiesTabComponent implements OnDestroy {
       });
       this.lightboxInstance.openGallery(startIndex);
     } catch (error) {
-      console.error('Unable to open preview', error);
+      log.error('Unable to open preview', error);
     }
   }
 

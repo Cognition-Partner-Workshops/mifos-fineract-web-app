@@ -14,6 +14,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LoansService } from '../loans.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { ClientsService } from 'app/clients/clients.service';
+import { Logger } from 'app/core/logger/logger.service';
+
+const log = new Logger('CreateLoansAccountComponent');
 
 /** Step Components */
 import { LoansAccountDetailsStepComponent } from '../loans-account-stepper/loans-account-details-step/loans-account-details-step.component';
@@ -108,7 +111,7 @@ export class CreateLoansAccountComponent {
       // Fineract API doesn't have "Group Collateral Management" endpoint; from the obsolete
       // community app it appears getCollateralTemplate(clientId) is called as well, but it's not clear how
       // the clientId is selected from the clientIds that belong to the group.
-      console.error('No collateral data requested from Fineract, collateral might misbehave');
+      log.error('No collateral data requested from Fineract, collateral might misbehave');
     }
     const entityId = this.loansAccountTemplate.clientId
       ? this.loansAccountTemplate.clientId

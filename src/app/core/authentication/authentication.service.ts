@@ -17,6 +17,9 @@ import { map } from 'rxjs/operators';
 import { OAuthService } from 'angular-oauth2-oidc';
 /** Custom Services */
 import { AlertService } from '../alert/alert.service';
+import { Logger } from '../logger/logger.service';
+
+const log = new Logger('AuthenticationService');
 
 /** Custom Interceptors */
 import { AuthenticationInterceptor } from './authentication.interceptor';
@@ -225,7 +228,7 @@ export class AuthenticationService {
             resolve();
           },
           error: (error) => {
-            console.error('Failed to fetch user details:', error);
+            log.error('Failed to fetch user details:', error);
             reject(error);
           }
         });
@@ -239,7 +242,7 @@ export class AuthenticationService {
             resolve();
           },
           error: (error) => {
-            console.error('Failed to fetch user details:', error);
+            log.error('Failed to fetch user details:', error);
             reject(error);
           }
         });
@@ -314,7 +317,7 @@ export class AuthenticationService {
 
       return false;
     } catch (error) {
-      console.error('OAuth callback failed:', error);
+      log.error('OAuth callback failed:', error);
       return false;
     }
   }
