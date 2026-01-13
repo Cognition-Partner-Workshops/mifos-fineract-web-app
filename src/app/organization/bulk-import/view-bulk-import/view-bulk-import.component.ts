@@ -26,6 +26,8 @@ import {
 } from '@angular/material/table';
 import { UntypedFormGroup, UntypedFormBuilder, ReactiveFormsModule } from '@angular/forms';
 
+import { Subject, takeUntil } from 'rxjs';
+
 /** Custom Imports */
 import { OrganizationService } from '../../organization.service';
 import { BulkImports } from './bulk-imports';
@@ -249,7 +251,6 @@ export class ViewBulkImportComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe((res: any) => {
         const contentType = res.headers.get('Content-Type');
-        import { Subject, takeUntil } from 'rxjs';
         const blob = new Blob([res.body], { type: contentType });
         const fileOfBlob = new File([blob], name, { type: contentType });
         window.open(window.URL.createObjectURL(fileOfBlob));
