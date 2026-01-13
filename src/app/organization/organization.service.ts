@@ -15,6 +15,7 @@ import { Observable } from 'rxjs';
 
 /** Custom Imports. */
 import { SettingsService } from 'app/settings/settings.service';
+import { SmsMessageFilter } from 'app/shared/models/general.model';
 
 /**
  * Organization service.
@@ -27,66 +28,66 @@ export class OrganizationService {
   private settingsService = inject(SettingsService);
 
   /**
-   * @returns {Observable<any>} Loan Provisioning Criteria data
+   * @returns {Observable<unknown>} Loan Provisioning Criteria data
    */
-  getProvisioningCriterias(): Observable<any> {
+  getProvisioningCriterias(): Observable<unknown> {
     return this.http.get('/provisioningcriteria');
   }
 
   /**
-   * @returns {Observable<any>} Loan Provisioning Criteria template.
+   * @returns {Observable<unknown>} Loan Provisioning Criteria template.
    */
-  getProvisioningCriteriaTemplate(): Observable<any> {
+  getProvisioningCriteriaTemplate(): Observable<unknown> {
     return this.http.get('/provisioningcriteria/template');
   }
 
   /**
    * @param {string} provisioningId Provisioning ID of Loan Provisioning Criteria.
-   * @returns {Observable<any>} Provisioning Criteria.
+   * @returns {Observable<unknown>} Provisioning Criteria.
    */
-  getProvisioningCriteria(provisioningId: string, template: boolean = false): Observable<any> {
+  getProvisioningCriteria(provisioningId: string, template: boolean = false): Observable<unknown> {
     const httpParams = new HttpParams().set('template', template.toString());
     return this.http.get(`/provisioningcriteria/${provisioningId}`, { params: httpParams });
   }
 
   /**
-   * @param {any} criteriaData Provisioning Criteria to be created.
-   * @returns {Observable<any>}
+   * @param {Record<string, unknown>} criteriaData Provisioning Criteria to be created.
+   * @returns {Observable<unknown>}
    */
-  createProvisioningCriteria(criteriaData: any): Observable<any> {
+  createProvisioningCriteria(criteriaData: Record<string, unknown>): Observable<unknown> {
     return this.http.post('/provisioningcriteria', criteriaData);
   }
 
   /**
-   * @param {any} criteriaId Criteria Id
-   * @param {any} criteriaData Provisioning Criteria to be created.
-   * @returns {Observable<any>}
+   * @param {string | number} criteriaId Criteria Id
+   * @param {Record<string, unknown>} criteriaData Provisioning Criteria to be created.
+   * @returns {Observable<unknown>}
    */
-  updateProvisioningCriteria(criteriaId: any, criteriaData: any): Observable<any> {
+  updateProvisioningCriteria(criteriaId: string | number, criteriaData: Record<string, unknown>): Observable<unknown> {
     return this.http.put(`/provisioningcriteria/${criteriaId}`, criteriaData);
   }
 
   /**
    * @param {string} provisioningId Provisioning ID of provisioning criteria to be deleted.
-   * @returns {Observable<any>}
+   * @returns {Observable<unknown>}
    */
-  deleteProvisioningCriteria(criteriaId: string): Observable<any> {
+  deleteProvisioningCriteria(criteriaId: string): Observable<unknown> {
     return this.http.delete(`/provisioningcriteria/${criteriaId}`);
   }
 
   /**
-   * @returns {Observable<any>} Offices data
+   * @returns {Observable<unknown>} Offices data
    */
-  getOffices(): Observable<any> {
+  getOffices(): Observable<unknown> {
     return this.http.get('/offices');
   }
 
   /**
    * Get Office Template.
    * @param {string} officeId Office Id of the office selected.
-   * @returns {Observable<any>} Office Template.
+   * @returns {Observable<unknown>} Office Template.
    */
-  getOfficeTemplate(officeId: string): Observable<any> {
+  getOfficeTemplate(officeId: string): Observable<unknown> {
     const httpParams = new HttpParams().set('officeId', officeId.toString());
     return this.http.get(`/loans/loanreassignment/template`, { params: httpParams });
   }
@@ -96,7 +97,7 @@ export class OrganizationService {
    * @param officerId Officer Id.
    * @param officeId Office Id.
    */
-  getOfficerTemplate(officerId: string, officeId: string): Observable<any> {
+  getOfficerTemplate(officerId: string, officeId: string): Observable<unknown> {
     const httpParams = new HttpParams()
       .set('fromLoanOfficerId', officerId.toString())
       .set('officeId', officeId.toString());
@@ -106,43 +107,43 @@ export class OrganizationService {
   /**
    * Bulk Loan Reassignment.
    * @param loanData Load Data to be created.
-   * @returns {Observable<any>}
+   * @returns {Observable<unknown>}
    */
-  createLoanReassignment(loanData: any): Observable<any> {
+  createLoanReassignment(loanData: Record<string, unknown>): Observable<unknown> {
     return this.http.post('/loans/loanreassignment', loanData);
   }
 
   /**
    * @param {string} officeId Office ID of Office.
    * @param {boolean} template
-   * @returns {Observable<any>} Office.
+   * @returns {Observable<unknown>} Office.
    */
-  getOffice(officeId: string, template: boolean = false): Observable<any> {
+  getOffice(officeId: string, template: boolean = false): Observable<unknown> {
     const httpParams = new HttpParams().set('template', template.toString());
     return this.http.get(`/offices/${officeId}`, { params: httpParams });
   }
 
   /**
-   * @param {any} office Office to be created.
-   * @returns {Observable<any>}
+   * @param {Record<string, unknown>} office Office to be created.
+   * @returns {Observable<unknown>}
    */
-  createOffice(office: any): Observable<any> {
+  createOffice(office: Record<string, unknown>): Observable<unknown> {
     return this.http.post('/offices', office);
   }
 
   /**
-   * @param {any} office Office to be updated.
+   * @param {Record<string, unknown>} office Office to be updated.
    * @param {string} officeId Office Id
-   * @returns {Observable<any>}
+   * @returns {Observable<unknown>}
    */
-  updateOffice(officeId: string, office: any): Observable<any> {
+  updateOffice(officeId: string, office: Record<string, unknown>): Observable<unknown> {
     return this.http.put(`/offices/${officeId}`, office);
   }
 
   /**
-   * @returns {Observable<any>}
+   * @returns {Observable<unknown>}
    */
-  getOfficeDatatables(): Observable<any> {
+  getOfficeDatatables(): Observable<unknown> {
     const httpParams = new HttpParams().set('apptable', 'm_office');
     return this.http.get(`/datatables`, { params: httpParams });
   }
@@ -150,9 +151,9 @@ export class OrganizationService {
   /**
    * @param officeId Office Id of office to get datatable for.
    * @param datatableName Data table name.
-   * @returns {Observable<any>}
+   * @returns {Observable<unknown>}
    */
-  getOfficeDatatable(officeId: string, datatableName: string): Observable<any> {
+  getOfficeDatatable(officeId: string, datatableName: string): Observable<unknown> {
     const httpParams = new HttpParams().set('genericResultSet', 'true');
     return this.http.get(`/datatables/${datatableName}/${officeId}`, { params: httpParams });
   }
@@ -161,9 +162,9 @@ export class OrganizationService {
    * @param officeId Office Id of office to get add datatable entry for.
    * @param datatableName Data Table name.
    * @param data Data.
-   * @returns {Observable<any>}
+   * @returns {Observable<unknown>}
    */
-  addOfficeDatatableEntry(officeId: string, datatableName: string, data: any): Observable<any> {
+  addOfficeDatatableEntry(officeId: string, datatableName: string, data: Record<string, unknown>): Observable<unknown> {
     const httpParams = new HttpParams().set('genericResultSet', 'true');
     return this.http.post(`/datatables/${datatableName}/${officeId}`, data, { params: httpParams });
   }
@@ -172,9 +173,13 @@ export class OrganizationService {
    * @param officeId Office Id of office to get add datatable entry for.
    * @param datatableName Data Table name.
    * @param data Data.
-   * @returns {Observable<any>}
+   * @returns {Observable<unknown>}
    */
-  editOfficeDatatableEntry(officeId: string, datatableName: string, data: any): Observable<any> {
+  editOfficeDatatableEntry(
+    officeId: string,
+    datatableName: string,
+    data: Record<string, unknown>
+  ): Observable<unknown> {
     const httpParams = new HttpParams().set('genericResultSet', 'true');
     return this.http.put(`/datatables/${datatableName}/${officeId}`, data, { params: httpParams });
   }
@@ -182,116 +187,116 @@ export class OrganizationService {
   /**
    * @param officeId Office Id of office to get add datatable entry for.
    * @param datatableName Data Table name.
-   * @returns {Observable<any>}
+   * @returns {Observable<unknown>}
    */
-  deleteDatatableContent(officeId: string, datatableName: string): Observable<any> {
+  deleteDatatableContent(officeId: string, datatableName: string): Observable<unknown> {
     const httpParams = new HttpParams().set('genericResultSet', 'true');
     return this.http.delete(`/datatables/${datatableName}/${officeId}`, { params: httpParams });
   }
 
   /**
-   * @returns {Observable<any>} Employees data
+   * @returns {Observable<unknown>} Employees data
    */
-  getEmployees(): Observable<any> {
+  getEmployees(): Observable<unknown> {
     const httpParams = new HttpParams().set('status', 'all');
     return this.http.get('/staff', { params: httpParams });
   }
 
   /**
-   * @param {any} employee Employee to be created.
-   * @returns {Observable<any>}
+   * @param {Record<string, unknown>} employee Employee to be created.
+   * @returns {Observable<unknown>}
    */
-  createEmployee(employee: any): Observable<any> {
+  createEmployee(employee: Record<string, unknown>): Observable<unknown> {
     return this.http.post('/staff', employee);
   }
 
   /**
    * @param {string} employeeId Employee ID of employee.
    * @param {boolean} template
-   * @returns {Observable<any>} Employee.
+   * @returns {Observable<unknown>} Employee.
    */
-  getEmployee(employeeId: string, template: boolean = true): Observable<any> {
+  getEmployee(employeeId: string, template: boolean = true): Observable<unknown> {
     const httpParams = new HttpParams().set('template', template.toString());
     return this.http.get(`/staff/${employeeId}`, { params: httpParams });
   }
 
   /**
-   * @returns {Observable<any>} Currencies data
+   * @returns {Observable<unknown>} Currencies data
    */
-  getCurrencies(): Observable<any> {
+  getCurrencies(): Observable<unknown> {
     return this.http.get('/currencies');
   }
 
   /**
-   * @param {any[]} currencies
-   * @returns {Observable<any>} Currencies data
+   * @param {Record<string, unknown>[]} currencies
+   * @returns {Observable<unknown>} Currencies data
    */
-  updateCurrencies(currencies: any[]): Observable<any> {
+  updateCurrencies(currencies: Record<string, unknown>[]): Observable<unknown> {
     return this.http.put('/currencies', { currencies });
   }
 
   /**
-   * @returns {Observable<any>} SMS Campaigns data
+   * @returns {Observable<unknown>} SMS Campaigns data
    */
-  getSmsCampaigns(): Observable<any> {
+  getSmsCampaigns(): Observable<unknown> {
     return this.http.get('/smscampaigns');
   }
 
   /**
    * @param {string} smsCampaignId SMS Campaign ID of SMS Campaign.
-   * @returns {Observable<any>} SMS Campaign.
+   * @returns {Observable<unknown>} SMS Campaign.
    */
-  getSmsCampaign(campaignId: string): Observable<any> {
+  getSmsCampaign(campaignId: string): Observable<unknown> {
     return this.http.get(`/smscampaigns/${campaignId}`);
   }
 
   /**
-   * @param {any} campaign Campaign to be created.
-   * @returns {Observable<any>}
+   * @param {Record<string, unknown>} campaign Campaign to be created.
+   * @returns {Observable<unknown>}
    */
-  createSmsCampaign(campaign: any): Observable<any> {
+  createSmsCampaign(campaign: Record<string, unknown>): Observable<unknown> {
     return this.http.post('/smscampaigns', campaign);
   }
 
   /**
-   * @param {any} campaign Campaign to be updated.
-   * @returns {Observable<any>}
+   * @param {Record<string, unknown>} campaign Campaign to be updated.
+   * @returns {Observable<unknown>}
    */
-  updateSmsCampaign(campaign: any, campaignId: string): Observable<any> {
+  updateSmsCampaign(campaign: Record<string, unknown>, campaignId: string): Observable<unknown> {
     return this.http.put(`/smscampaigns/${campaignId}`, campaign);
   }
 
   /**
-   * @param {any} campaign Campaign to be deleted.
-   * @returns {Observable<any>}
+   * @param {string} campaignId Campaign to be deleted.
+   * @returns {Observable<unknown>}
    */
-  deleteSmsCampaign(campaignId: string): Observable<any> {
+  deleteSmsCampaign(campaignId: string): Observable<unknown> {
     return this.http.delete(`/smscampaigns/${campaignId}`);
   }
 
   /**
-   * @returns {Observable<any>} SMS Campaign template
+   * @returns {Observable<unknown>} SMS Campaign template
    */
-  getSmsCampaignTemplate(): Observable<any> {
+  getSmsCampaignTemplate(): Observable<unknown> {
     return this.http.get('/smscampaigns/template');
   }
 
   /**
    * @param {string} campaignId Campaign Id
-   * @param {any} data Data
+   * @param {Record<string, unknown>} data Data
    * @param {string} command Command
-   * @returns {Observable<any>}
+   * @returns {Observable<unknown>}
    */
-  executeSmsCampaignCommand(campaignId: string, data: any, command: string): Observable<any> {
+  executeSmsCampaignCommand(campaignId: string, data: Record<string, unknown>, command: string): Observable<unknown> {
     const httpParams = new HttpParams().set('command', command.toString());
     return this.http.post(`/smscampaigns/${campaignId}`, data, { params: httpParams });
   }
 
   /**
-   * @param {any} SMS
-   * @returns {Observable<any>} Messages Data
+   * @param {SmsMessageFilter} SMS
+   * @returns {Observable<unknown>} Messages Data
    */
-  getMessagebyStatus(SMS: any): Observable<any> {
+  getMessagebyStatus(SMS: SmsMessageFilter): Observable<unknown> {
     let httpParams = new HttpParams()
       .set('status', SMS.status.toString())
       .set('locale', SMS.locale)
