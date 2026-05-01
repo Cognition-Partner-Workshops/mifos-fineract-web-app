@@ -1,10 +1,7 @@
 name: Playwright E2E Tests
 
 on:
-  push:
-    branches: [main, dev, dev-angular-19]
-  pull_request:
-    branches: [main, dev, dev-angular-19]
+  workflow_dispatch:
 
 jobs:
   playwright:
